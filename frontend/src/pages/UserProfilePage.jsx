@@ -160,9 +160,9 @@ function ProfileField({ icon, label, value }) {
     return (
         <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3, 0.75rem)', padding: '12px 0', borderBottom: '1px solid var(--color-gray-100)' }}>
             <span style={{ color: 'var(--color-primary)', fontSize: '1rem', width: 20, flexShrink: 0 }}>{icon}</span>
-            <div>
+            <div style={{ minWidth: 0, flex: 1 }}>
                 <p style={{ fontSize: 'var(--font-size-xs)', fontWeight: 600, color: 'var(--color-gray-400)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</p>
-                <p style={{ color: 'var(--color-gray-700)' }}>{value}</p>
+                <p style={{ color: 'var(--color-gray-700)', wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{value}</p>
             </div>
         </div>
     );
