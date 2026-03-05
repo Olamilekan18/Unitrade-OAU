@@ -68,10 +68,11 @@ app.post('/api/sessions', async (req, res, next) => {
       { expiresIn: '1d' }
     );
 
+    const isProd = process.env.NODE_ENV === 'production';
     res.cookie('access_token', token, {
       httpOnly: true,
-      secure: process.env.NODE_ENV === 'production',
-      sameSite: 'lax',
+      secure: isProd, // Must be true when sameSite is 'none'
+      sameSite: isProd ? 'none' : 'lax', // Required for cross-domain cookies (Vercel -> Render)
       maxAge: 24 * 60 * 60 * 1000
     });
 
@@ -98,7 +99,12 @@ app.get('/api/sessions/me', async (req, res, next) => {
 });
 
 app.delete('/api/sessions', (_req, res) => {
-  res.clearCookie('access_token');
+  const isProd = process.env.NODE_ENV === 'production';
+  res.clearCookie('access_token', {
+    httpOnly: true,
+    secure: isProd,
+    sameSite: isProd ? 'none' : 'lax',
+  });
   res.json({ success: true, message: 'Logged out' });
 });
 
