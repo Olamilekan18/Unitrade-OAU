@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { FaBoxOpen, FaSpinner } from 'react-icons/fa';
 import { fetchProducts } from '../utils/api';
+import ProductCard from './ProductCard';
 
-function MarketplaceFeed() {
+function MarketplaceFeed({ searchQuery, selectedCategory }) {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -23,39 +24,65 @@ function MarketplaceFeed() {
     loadProducts();
   }, []);
 
+  // Client-side filtering
+  const filtered = products.filter((product) => {
+    const matchesSearch =
+      !searchQuery ||
+      product.title.toLowerCase().includes(searchQuery.toLowerCase());
+
+    const matchesCategory =
+      selectedCategory === null ||
+      selectedCategory === undefined ||
+      product.categories?.id === selectedCategory;
+
+    return matchesSearch && matchesCategory;
+  });
+
   if (loading) {
     return (
-      <div className="state-block">
-        <FaSpinner className="spin" /> Loading listings...
+      <div className="product-grid">
+        {[1, 2, 3, 4, 5, 6].map((n) => (
+          <div key={n} className="skeleton-card">
+            <div className="skeleton-image skeleton" />
+            <div className="skeleton-body">
+              <div className="skeleton-line skeleton skeleton-line-medium" />
+              <div className="skeleton-line skeleton skeleton-line-short" />
+              <div className="skeleton-line skeleton skeleton-line-short" />
+            </div>
+          </div>
+        ))}
       </div>
     );
   }
 
   if (error) {
-    return <div className="state-block error">{error}</div>;
-  }
-
-  if (!products.length) {
     return (
       <div className="state-block">
-        <FaBoxOpen /> No products available yet.
+        <FaSpinner />
+        <p>{error}</p>
+      </div>
+    );
+  }
+
+  if (!filtered.length) {
+    return (
+      <div className="state-block">
+        <FaBoxOpen />
+        <p>
+          {searchQuery || selectedCategory
+            ? 'No products match your filters.'
+            : 'No products available yet. Be the first to list!'}
+        </p>
       </div>
     );
   }
 
   return (
-    <section className="feed-grid">
-      {products.map((product) => (
-        <article key={product.id} className="card">
-          <img src={product.image_url} alt={product.title} className="card-image" />
-          <div className="card-body">
-            <h3>{product.title}</h3>
-            <p className="price">₦{Number(product.price).toLocaleString()}</p>
-            <p className="meta">{product.categories?.name || 'General'} • {product.users?.department || 'OAU'}</p>
-          </div>
-        </article>
+    <div className="product-grid stagger">
+      {filtered.map((product) => (
+        <ProductCard key={product.id} product={product} />
       ))}
-    </section>
+    </div>
   );
 }
 
