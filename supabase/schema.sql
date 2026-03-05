@@ -4,8 +4,15 @@ create extension if not exists "pgcrypto";
 create table if not exists public.users (
   id uuid primary key default gen_random_uuid(),
   name text not null,
-  oau_email text not null unique check (oau_email ilike '%@oauife.edu.ng'),
+  oau_email text not null unique check (oau_email ilike '%oauife.edu.ng'),
+  password_hash text not null,
   department text not null,
+  store_name text default '',
+  bio text default '',
+  phone text default '',
+  address text default '',
+  avatar_url text default '',
+  is_verified boolean not null default false,
   access_status text not null default 'pending' check (access_status in ('pending', 'approved')),
   created_at timestamptz not null default now()
 );
@@ -27,9 +34,38 @@ create table if not exists public.products (
   created_at timestamptz not null default now()
 );
 
+create table if not exists public.reviews (
+  id uuid primary key default gen_random_uuid(),
+  product_id uuid not null references public.products(id) on update cascade on delete cascade,
+  reviewer_id uuid not null references public.users(id) on update cascade on delete cascade,
+  rating integer not null check (rating >= 1 and rating <= 5),
+  comment text default '',
+  created_at timestamptz not null default now(),
+  unique(product_id, reviewer_id)
+);
+
+create table if not exists public.verification_requests (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.users(id) on update cascade on delete cascade,
+  reason text not null,
+  status text not null default 'pending' check (status in ('pending', 'approved', 'rejected')),
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.notifications (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references public.users(id) on update cascade on delete cascade,
+  type text not null default 'info' check (type in ('info', 'approval', 'verification', 'review')),
+  message text not null,
+  is_read boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
 create index if not exists idx_products_category_id on public.products(category_id);
 create index if not exists idx_products_seller_id on public.products(seller_id);
 create index if not exists idx_products_status_created_at on public.products(status, created_at desc);
+create index if not exists idx_reviews_product_id on public.reviews(product_id);
+create index if not exists idx_reviews_reviewer_id on public.reviews(reviewer_id);
 
 insert into public.categories (name)
 values ('Textbooks'), ('Hostel Gear'), ('Electronics'), ('Fashion')
@@ -38,21 +74,37 @@ on conflict (name) do nothing;
 alter table public.users enable row level security;
 alter table public.categories enable row level security;
 alter table public.products enable row level security;
+alter table public.reviews enable row level security;
+alter table public.verification_requests enable row level security;
 
 -- Public read access for categories and available products.
-create policy if not exists "Public can read categories"
+drop policy if exists "Public can read categories" on public.categories;
+create policy "Public can read categories"
   on public.categories for select
   using (true);
 
-create policy if not exists "Public can read available products"
+drop policy if exists "Public can read available products" on public.products;
+create policy "Public can read available products"
   on public.products for select
   using (status = 'available');
 
--- App backend (service role) bypasses RLS. These policies support anon/authenticated reads and authenticated writes if needed.
-create policy if not exists "Authenticated can insert access requests"
+drop policy if exists "Public can read reviews" on public.reviews;
+create policy "Public can read reviews"
+  on public.reviews for select
+  using (true);
+
+-- App backend (service role) bypasses RLS.
+drop policy if exists "Authenticated can insert access requests" on public.users;
+create policy "Authenticated can insert access requests"
   on public.users for insert
   with check (access_status = 'pending');
 
-create policy if not exists "Authenticated can insert products"
+drop policy if exists "Authenticated can insert products" on public.products;
+create policy "Authenticated can insert products"
   on public.products for insert
+  with check (true);
+
+drop policy if exists "Authenticated can insert reviews" on public.reviews;
+create policy "Authenticated can insert reviews"
+  on public.reviews for insert
   with check (true);
