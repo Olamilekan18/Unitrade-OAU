@@ -32,6 +32,24 @@ class ProductController {
       next(error);
     }
   }
+
+  static async getProductById(req, res, next) {
+    try {
+      const product = await productService.getProductById(req.params.id);
+      res.json({ success: true, data: product });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getProductsBySeller(req, res, next) {
+    try {
+      const products = await productService.getProductsBySeller(req.params.id);
+      res.json({ success: true, data: products });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 module.exports = ProductController;
