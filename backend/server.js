@@ -22,10 +22,23 @@ const reviewService = new ReviewService(supabase);
 const notificationService = new NotificationService(supabase);
 const emailService = new EmailService();
 
+// Allow local dev and Vercel deployed frontend
+const allowedOrigins = [
+  'http://localhost:5173',
+  'https://unitrade-oau.vercel.app',
+  process.env.FRONTEND_ORIGIN // Fallback if set in Render env
+].filter(Boolean);
+
 app.use(
   cors({
-    origin: process.env.FRONTEND_ORIGIN || 'http://localhost:5173',
-    credentials: true
+    origin: function (origin, callback) {
+      if (!origin || allowedOrigins.includes(origin)) {
+        callback(null, true);
+      } else {
+        callback(new Error('Not allowed by CORS'));
+      }
+    },
+    credentials: true,
   })
 );
 app.use(express.json());
