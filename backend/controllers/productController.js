@@ -1,0 +1,37 @@
+const supabase = require('../config/supabaseClient');
+const ProductService = require('../services/ProductService');
+
+const productService = new ProductService(supabase);
+
+class ProductController {
+  static async createProduct(req, res, next) {
+    try {
+      const { title, price, description, category_id, image_url } = req.body;
+
+      const product = await productService.createProduct({
+        title,
+        price,
+        description,
+        category_id,
+        image_url,
+        seller_id: req.user.id,
+        status: 'available'
+      });
+
+      res.status(201).json({ success: true, data: product });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async getProducts(req, res, next) {
+    try {
+      const products = await productService.getAvailableProducts();
+      res.json({ success: true, data: products });
+    } catch (error) {
+      next(error);
+    }
+  }
+}
+
+module.exports = ProductController;
