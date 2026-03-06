@@ -336,6 +336,51 @@ app.post('/api/conversations/:id/messages', verifyJwt, async (req, res, next) =>
   try {
     const message = await chatService.sendMessage(req.params.id, req.user.id, req.body.content);
     res.status(201).json({ success: true, data: message });
+
+    // Send email notification in the background (don't block response)
+    (async () => {
+      try {
+        // Get the conversation to find the other user
+        const { data: conv } = await supabase
+          .from('conversations')
+          .select('buyer_id, seller_id, product_id')
+          .eq('id', req.params.id)
+          .single();
+
+        if (!conv) return;
+
+        const recipientId = conv.buyer_id === req.user.id ? conv.seller_id : conv.buyer_id;
+
+        // Get sender and recipient info
+        const [senderRes, recipientRes] = await Promise.all([
+          supabase.from('users').select('name, store_name').eq('id', req.user.id).single(),
+          supabase.from('users').select('name, oau_email').eq('id', recipientId).single(),
+        ]);
+
+        if (!recipientRes.data || !senderRes.data) return;
+
+        // Get product title if conversation is about a product
+        let productTitle = null;
+        if (conv.product_id) {
+          const { data: prod } = await supabase
+            .from('products')
+            .select('title')
+            .eq('id', conv.product_id)
+            .single();
+          if (prod) productTitle = prod.title;
+        }
+
+        await emailService.sendNewMessageEmail({
+          recipientEmail: recipientRes.data.oau_email,
+          recipientName: recipientRes.data.name,
+          senderName: senderRes.data.store_name || senderRes.data.name,
+          messagePreview: req.body.content,
+          productTitle,
+        });
+      } catch (emailErr) {
+        console.error('[Chat Email] Failed:', emailErr.message);
+      }
+    })();
   } catch (error) {
     next(error);
   }

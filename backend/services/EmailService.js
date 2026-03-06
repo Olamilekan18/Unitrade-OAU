@@ -1,37 +1,37 @@
 const nodemailer = require('nodemailer');
 
 class EmailService {
-    constructor() {
-        this.transporter = nodemailer.createTransport({
-            host: process.env.SMTP_HOST || 'smtp.gmail.com',
-            port: Number(process.env.SMTP_PORT) || 587,
-            secure: false,
-            auth: {
-                user: process.env.SMTP_USER,
-                pass: process.env.SMTP_PASS,
-            },
-        });
+  constructor() {
+    this.transporter = nodemailer.createTransport({
+      host: process.env.SMTP_HOST || 'smtp.gmail.com',
+      port: Number(process.env.SMTP_PORT) || 587,
+      secure: false,
+      auth: {
+        user: process.env.SMTP_USER,
+        pass: process.env.SMTP_PASS,
+      },
+    });
 
-        this.from = process.env.SMTP_FROM || '"UniTrade OAU" <noreply@unitrade.oau>';
+    this.from = process.env.SMTP_FROM || '"UniTrade OAU" <noreply@unitrade.oau>';
+  }
+
+  async send(to, subject, html) {
+    // Skip if SMTP is not configured
+    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+      console.log(`[Email] SMTP not configured. Would have sent to ${to}: "${subject}"`);
+      return;
     }
 
-    async send(to, subject, html) {
-        // Skip if SMTP is not configured
-        if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
-            console.log(`[Email] SMTP not configured. Would have sent to ${to}: "${subject}"`);
-            return;
-        }
-
-        try {
-            await this.transporter.sendMail({ from: this.from, to, subject, html });
-            console.log(`[Email] Sent to ${to}: "${subject}"`);
-        } catch (err) {
-            console.error(`[Email] Failed to send to ${to}:`, err.message);
-        }
+    try {
+      await this.transporter.sendMail({ from: this.from, to, subject, html });
+      console.log(`[Email] Sent to ${to}: "${subject}"`);
+    } catch (err) {
+      console.error(`[Email] Failed to send to ${to}:`, err.message);
     }
+  }
 
-    async sendApprovalEmail(user) {
-        const html = `
+  async sendApprovalEmail(user) {
+    const html = `
       <div style="font-family: 'Inter', sans-serif; max-width: 520px; margin: auto; padding: 32px; background: #f9fafb; border-radius: 16px;">
         <div style="text-align: center; margin-bottom: 24px;">
           <h1 style="color: #059669; margin: 0; font-size: 24px;">🎉 Welcome to UniTrade!</h1>
@@ -56,11 +56,11 @@ class EmailService {
       </div>
     `;
 
-        await this.send(user.oau_email, '🎉 Your UniTrade account has been approved!', html);
-    }
+    await this.send(user.oau_email, '🎉 Your UniTrade account has been approved!', html);
+  }
 
-    async sendVerificationEmail(user) {
-        const html = `
+  async sendVerificationEmail(user) {
+    const html = `
       <div style="font-family: 'Inter', sans-serif; max-width: 520px; margin: auto; padding: 32px; background: #f0f9ff; border-radius: 16px;">
         <div style="text-align: center; margin-bottom: 24px;">
           <h1 style="color: #1d9bf0; margin: 0; font-size: 24px;">✅ You're Verified!</h1>
@@ -85,8 +85,47 @@ class EmailService {
       </div>
     `;
 
-        await this.send(user.oau_email, '✅ Your UniTrade seller account is now verified!', html);
-    }
+    await this.send(user.oau_email, '✅ Your UniTrade seller account is now verified!', html);
+  }
+
+  async sendNewMessageEmail({ recipientEmail, recipientName, senderName, messagePreview, productTitle }) {
+    const preview = messagePreview.length > 100 ? messagePreview.slice(0, 100) + '...' : messagePreview;
+    const productLine = productTitle
+      ? '<p style="color: #9ca3af; font-size: 13px;">Regarding: <strong>' + productTitle + '</strong></p>'
+      : '';
+    const frontendUrl = process.env.FRONTEND_ORIGIN || 'http://localhost:5173';
+
+    const html = `
+      <div style="font-family: 'Inter', sans-serif; max-width: 520px; margin: auto; padding: 32px; background: #f9fafb; border-radius: 16px;">
+        <div style="text-align: center; margin-bottom: 24px;">
+          <h1 style="color: #059669; margin: 0; font-size: 24px;">&#128172; New Message</h1>
+        </div>
+        <div style="background: white; padding: 24px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+          <p style="color: #374151; font-size: 16px;">Hi <strong>${recipientName}</strong>,</p>
+          <p style="color: #6b7280; line-height: 1.6;">
+            <strong>${senderName}</strong> sent you a message on UniTrade:
+          </p>
+          <div style="background: #f3f4f6; padding: 16px; border-radius: 8px; margin: 16px 0; border-left: 3px solid #059669;">
+            <p style="color: #374151; margin: 0; font-style: italic;">&ldquo;${preview}&rdquo;</p>
+          </div>
+          ${productLine}
+          <div style="text-align: center; margin: 24px 0;">
+            <a href="${frontendUrl}/chat"
+               style="display: inline-block; background: #059669; color: white; padding: 12px 32px;
+                      border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;">
+              View Conversation
+            </a>
+          </div>
+          <p style="color: #9ca3af; font-size: 13px; text-align: center;">
+            &mdash; The UniTrade OAU Team
+          </p>
+        </div>
+      </div>
+    `;
+
+    await this.send(recipientEmail, 'New message from ' + senderName + ' on UniTrade', html);
+  }
 }
 
 module.exports = EmailService;
+

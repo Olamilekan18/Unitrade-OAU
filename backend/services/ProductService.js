@@ -10,7 +10,7 @@ class ProductService {
       .select(`
         id, title, price, description, image_url, status, created_at,
         categories:category_id(id, name),
-        users:seller_id(id, name, department, store_name, is_verified, avatar_url)
+        users:seller_id(id, name, department, store_name, is_verified, avatar_url, address)
       `)
       .single();
 
@@ -24,7 +24,7 @@ class ProductService {
       .select(`
         id, title, price, description, image_url, status, created_at,
         categories:category_id(id, name),
-        users:seller_id(id, name, department, store_name, is_verified, avatar_url)
+        users:seller_id(id, name, department, store_name, is_verified, avatar_url, address)
       `)
       .eq('status', 'available')
       .order('created_at', { ascending: false });
@@ -39,7 +39,7 @@ class ProductService {
       .select(`
         id, title, price, description, image_url, status, created_at,
         categories:category_id(id, name),
-        users:seller_id(id, name, department, store_name, is_verified, avatar_url, phone)
+        users:seller_id(id, name, department, store_name, is_verified, avatar_url, phone, address)
       `)
       .eq('id', id)
       .maybeSingle();
