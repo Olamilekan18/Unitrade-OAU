@@ -55,8 +55,27 @@ create table if not exists public.verification_requests (
 create table if not exists public.notifications (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references public.users(id) on update cascade on delete cascade,
-  type text not null default 'info' check (type in ('info', 'approval', 'verification', 'review')),
+  type text not null default 'info' check (type in ('info', 'approval', 'verification', 'review', 'message')),
   message text not null,
+  is_read boolean not null default false,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.conversations (
+  id uuid primary key default gen_random_uuid(),
+  buyer_id uuid not null references public.users(id) on update cascade on delete cascade,
+  seller_id uuid not null references public.users(id) on update cascade on delete cascade,
+  product_id uuid references public.products(id) on update cascade on delete set null,
+  updated_at timestamptz not null default now(),
+  created_at timestamptz not null default now(),
+  unique(buyer_id, seller_id, product_id)
+);
+
+create table if not exists public.messages (
+  id uuid primary key default gen_random_uuid(),
+  conversation_id uuid not null references public.conversations(id) on update cascade on delete cascade,
+  sender_id uuid not null references public.users(id) on update cascade on delete cascade,
+  content text not null,
   is_read boolean not null default false,
   created_at timestamptz not null default now()
 );
@@ -66,6 +85,10 @@ create index if not exists idx_products_seller_id on public.products(seller_id);
 create index if not exists idx_products_status_created_at on public.products(status, created_at desc);
 create index if not exists idx_reviews_product_id on public.reviews(product_id);
 create index if not exists idx_reviews_reviewer_id on public.reviews(reviewer_id);
+create index if not exists idx_conversations_buyer on public.conversations(buyer_id);
+create index if not exists idx_conversations_seller on public.conversations(seller_id);
+create index if not exists idx_messages_conversation on public.messages(conversation_id, created_at);
+create index if not exists idx_messages_sender on public.messages(sender_id);
 
 insert into public.categories (name)
 values ('Textbooks'), ('Hostel Gear'), ('Electronics'), ('Fashion')
@@ -76,6 +99,8 @@ alter table public.categories enable row level security;
 alter table public.products enable row level security;
 alter table public.reviews enable row level security;
 alter table public.verification_requests enable row level security;
+alter table public.conversations enable row level security;
+alter table public.messages enable row level security;
 
 -- Public read access for categories and available products.
 drop policy if exists "Public can read categories" on public.categories;
@@ -108,3 +133,4 @@ drop policy if exists "Authenticated can insert reviews" on public.reviews;
 create policy "Authenticated can insert reviews"
   on public.reviews for insert
   with check (true);
+
