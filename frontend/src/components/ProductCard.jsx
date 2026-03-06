@@ -3,7 +3,7 @@ import { FaMapMarkerAlt, FaCheckCircle, FaStar } from 'react-icons/fa';
 
 function ProductCard({ product }) {
     const categoryName = product.categories?.name || 'General';
-    const sellerDept = product.users?.department || 'OAU';
+    const sellerLocation = product.users?.address || product.users?.department || 'OAU';
     const sellerName = product.users?.store_name || product.users?.name || 'Seller';
     const sellerId = product.users?.id;
     const isVerified = product.users?.is_verified;
@@ -35,7 +35,7 @@ function ProductCard({ product }) {
 
             <div className="product-card-meta" style={{ padding: '0 var(--space-4) var(--space-4)' }}>
                 <FaMapMarkerAlt />
-                <span>{sellerDept}</span>
+                <span>{sellerLocation}</span>
                 <span style={{ margin: '0 4px' }}>•</span>
                 {sellerId ? (
                     <Link
