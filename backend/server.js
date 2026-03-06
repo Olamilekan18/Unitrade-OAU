@@ -12,6 +12,7 @@ const CategoryService = require('./services/CategoryService');
 const ReviewService = require('./services/ReviewService');
 const NotificationService = require('./services/NotificationService');
 const EmailService = require('./services/EmailService');
+const ChatService = require('./services/ChatService');
 const { errorHandler } = require('./middlewares/errorMiddleware');
 const { verifyJwt } = require('./middlewares/authMiddleware');
 
@@ -21,6 +22,7 @@ const categoryService = new CategoryService(supabase);
 const reviewService = new ReviewService(supabase);
 const notificationService = new NotificationService(supabase);
 const emailService = new EmailService();
+const chatService = new ChatService(supabase);
 
 // Allow local dev and Vercel deployed frontend
 const allowedOrigins = [
@@ -45,6 +47,49 @@ app.use(express.json());
 app.use(cookieParser());
 
 app.get('/api/health', (_req, res) => res.json({ success: true, message: 'UniTrade API healthy' }));
+
+// ── Supabase Webhook: User Approved ──
+// Fires when access_status is changed to 'approved' in Supabase dashboard
+app.post('/api/webhooks/user-approved', async (req, res) => {
+  try {
+    // Verify webhook secret
+    const secret = req.headers['x-webhook-secret'];
+    if (secret !== process.env.WEBHOOK_SECRET) {
+      return res.status(403).json({ success: false, message: 'Forbidden' });
+    }
+
+    const { type, record, old_record } = req.body;
+
+    // Only process UPDATE events where access_status changed to 'approved'
+    if (
+      type === 'UPDATE' &&
+      record?.access_status === 'approved' &&
+      old_record?.access_status === 'pending'
+    ) {
+      // Send approval email
+      await emailService.sendApprovalEmail({
+        id: record.id,
+        name: record.name,
+        oau_email: record.oau_email,
+        department: record.department,
+      });
+
+      // Create in-app notification
+      await notificationService.create(
+        record.id,
+        'approval',
+        'Your UniTrade account has been approved! You can now log in and start trading.'
+      );
+
+      console.log(`[Webhook] Approval email sent to ${record.oau_email}`);
+    }
+
+    res.json({ success: true });
+  } catch (error) {
+    console.error('[Webhook] Error:', error.message);
+    res.status(500).json({ success: false, message: error.message });
+  }
+});
 
 // ── Access Requests (Register with password) ──
 app.post('/api/access-requests', async (req, res, next) => {
@@ -249,6 +294,56 @@ app.put('/api/notifications/read-all', verifyJwt, async (req, res, next) => {
 app.put('/api/notifications/:id/read', verifyJwt, async (req, res, next) => {
   try {
     await notificationService.markAsRead(req.params.id, req.user.id);
+    res.json({ success: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ── Chat / Conversations ──
+app.post('/api/conversations', verifyJwt, async (req, res, next) => {
+  try {
+    const { sellerId, productId } = req.body;
+    const conversation = await chatService.getOrCreateConversation(req.user.id, sellerId, productId);
+    res.status(201).json({ success: true, data: conversation });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/conversations', verifyJwt, async (req, res, next) => {
+  try {
+    const conversations = await chatService.getConversations(req.user.id);
+    const unreadCount = await chatService.getUnreadCount(req.user.id);
+    res.json({ success: true, data: { conversations, unreadCount } });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/conversations/:id/messages', verifyJwt, async (req, res, next) => {
+  try {
+    const messages = await chatService.getMessages(req.params.id, req.user.id);
+    // Auto-mark as read when fetching
+    await chatService.markMessagesRead(req.params.id, req.user.id);
+    res.json({ success: true, data: messages });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/api/conversations/:id/messages', verifyJwt, async (req, res, next) => {
+  try {
+    const message = await chatService.sendMessage(req.params.id, req.user.id, req.body.content);
+    res.status(201).json({ success: true, data: message });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.put('/api/conversations/:id/read', verifyJwt, async (req, res, next) => {
+  try {
+    await chatService.markMessagesRead(req.params.id, req.user.id);
     res.json({ success: true });
   } catch (error) {
     next(error);
