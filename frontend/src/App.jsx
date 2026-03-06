@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route } from 'react-router-dom';
+import { BrowserRouter, Routes, Route, useLocation } from 'react-router-dom';
 import { AuthProvider } from './context/AuthContext';
 import Navbar from './components/Navbar';
 import Footer from './components/Footer';
@@ -10,26 +10,40 @@ import CreateListing from './pages/CreateListing';
 import ProfilePage from './pages/ProfilePage';
 import UserProfilePage from './pages/UserProfilePage';
 import ProductDetailPage from './pages/ProductDetailPage';
+import ChatPage from './pages/ChatPage';
+
+function AppContent() {
+  const location = useLocation();
+  const hideFooter = location.pathname === '/chat';
+
+  return (
+    <>
+      <Navbar />
+      <Routes>
+        <Route path="/" element={<LandingPage />} />
+        <Route path="/marketplace" element={<MarketplacePage />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/request-access" element={<RequestAccessPage />} />
+        <Route path="/sell" element={<CreateListing />} />
+        <Route path="/profile" element={<ProfilePage />} />
+        <Route path="/users/:id" element={<UserProfilePage />} />
+        <Route path="/product/:id" element={<ProductDetailPage />} />
+        <Route path="/chat" element={<ChatPage />} />
+      </Routes>
+      {!hideFooter && <Footer />}
+    </>
+  );
+}
 
 function App() {
   return (
     <BrowserRouter>
       <AuthProvider>
-        <Navbar />
-        <Routes>
-          <Route path="/" element={<LandingPage />} />
-          <Route path="/marketplace" element={<MarketplacePage />} />
-          <Route path="/login" element={<LoginPage />} />
-          <Route path="/request-access" element={<RequestAccessPage />} />
-          <Route path="/sell" element={<CreateListing />} />
-          <Route path="/profile" element={<ProfilePage />} />
-          <Route path="/users/:id" element={<UserProfilePage />} />
-          <Route path="/product/:id" element={<ProductDetailPage />} />
-        </Routes>
-        <Footer />
+        <AppContent />
       </AuthProvider>
     </BrowserRouter>
   );
 }
 
 export default App;
+

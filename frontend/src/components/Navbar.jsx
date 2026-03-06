@@ -3,15 +3,17 @@ import { Link, NavLink, useNavigate } from 'react-router-dom';
 import {
     FaBars, FaTimes, FaShoppingBag, FaSignOutAlt, FaPlus,
     FaUserCircle, FaBell, FaCheckCircle, FaShieldAlt, FaInfoCircle, FaStar,
+    FaCommentDots,
 } from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext';
-import { fetchNotifications, markAllNotificationsRead } from '../utils/api';
+import { fetchNotifications, markAllNotificationsRead, fetchConversations } from '../utils/api';
 
 function Navbar() {
     const [menuOpen, setMenuOpen] = useState(false);
     const [notifOpen, setNotifOpen] = useState(false);
     const [notifications, setNotifications] = useState([]);
     const [unreadCount, setUnreadCount] = useState(0);
+    const [chatUnread, setChatUnread] = useState(0);
     const { user, isAuthenticated, logout } = useAuth();
     const navigate = useNavigate();
     const notifRef = useRef(null);
@@ -20,7 +22,11 @@ function Navbar() {
     useEffect(() => {
         if (!isAuthenticated) return;
         loadNotifications();
-        const interval = setInterval(loadNotifications, 30000);
+        loadChatUnread();
+        const interval = setInterval(() => {
+            loadNotifications();
+            loadChatUnread();
+        }, 30000);
         return () => clearInterval(interval);
     }, [isAuthenticated]);
 
@@ -40,6 +46,15 @@ function Navbar() {
             const res = await fetchNotifications();
             setNotifications(res.data.notifications || []);
             setUnreadCount(res.data.unreadCount || 0);
+        } catch {
+            // Silently fail
+        }
+    }
+
+    async function loadChatUnread() {
+        try {
+            const res = await fetchConversations();
+            setChatUnread(res.data.unreadCount || 0);
         } catch {
             // Silently fail
         }
@@ -105,6 +120,22 @@ function Navbar() {
                             </NavLink>
                             <NavLink to="/profile" onClick={closeMenu}>
                                 <FaUserCircle style={{ marginRight: 4 }} /> Profile
+                            </NavLink>
+
+                            {/* Chat Icon */}
+                            <NavLink to="/chat" onClick={closeMenu} style={{ position: 'relative' }}>
+                                <FaCommentDots style={{ marginRight: 4 }} /> Chat
+                                {chatUnread > 0 && (
+                                    <span style={{
+                                        position: 'absolute', top: -6, right: -10,
+                                        background: '#ef4444', color: 'white',
+                                        borderRadius: '50%', width: 18, height: 18,
+                                        display: 'flex', alignItems: 'center', justifyContent: 'center',
+                                        fontSize: '0.65rem', fontWeight: 700,
+                                    }}>
+                                        {chatUnread > 9 ? '9+' : chatUnread}
+                                    </span>
+                                )}
                             </NavLink>
 
                             {/* Notification Bell */}

@@ -134,3 +134,32 @@ export async function markNotificationRead(id) {
 export async function markAllNotificationsRead() {
   return apiFetch('/notifications/read-all', { method: 'PUT' });
 }
+
+/* ── Chat / Conversations ── */
+export async function createConversation(sellerId, productId) {
+  return apiFetch('/conversations', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ sellerId, productId }),
+  });
+}
+
+export async function fetchConversations() {
+  return apiFetch('/conversations');
+}
+
+export async function fetchMessages(conversationId) {
+  return apiFetch(`/conversations/${conversationId}/messages`);
+}
+
+export async function sendMessage(conversationId, content) {
+  return apiFetch(`/conversations/${conversationId}/messages`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ content }),
+  });
+}
+
+export async function markConversationRead(conversationId) {
+  return apiFetch(`/conversations/${conversationId}/read`, { method: 'PUT' });
+}

@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
     FaStar, FaRegStar, FaSpinner, FaMapMarkerAlt, FaCheckCircle,
-    FaArrowLeft, FaPaperPlane, FaTag, FaClock, FaUser,
+    FaArrowLeft, FaPaperPlane, FaTag, FaClock, FaUser, FaCommentDots,
 } from 'react-icons/fa';
 import { fetchProduct, fetchReviews, createReview } from '../utils/api';
 import { useAuth } from '../context/AuthContext';
@@ -179,9 +179,18 @@ function ProductDetailPage() {
                                     </p>
                                 </div>
                                 {seller.phone && (
-                                    <a href={`tel:${seller.phone}`} className="btn btn-primary" style={{ fontSize: '0.8rem', padding: '8px 16px' }}>
+                                    <a href={`tel:${seller.phone}`} className="btn btn-outline" style={{ fontSize: '0.8rem', padding: '8px 16px' }}>
                                         Contact
                                     </a>
+                                )}
+                                {isAuthenticated && seller.id !== user?.id && (
+                                    <Link
+                                        to={`/chat?seller=${seller.id}&product=${product.id}`}
+                                        className="btn btn-primary"
+                                        style={{ fontSize: '0.8rem', padding: '8px 16px', display: 'inline-flex', alignItems: 'center', gap: 6 }}
+                                    >
+                                        <FaCommentDots /> Chat with Seller
+                                    </Link>
                                 )}
                             </div>
                         </div>
