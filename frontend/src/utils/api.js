@@ -209,6 +209,10 @@ export async function markOrderAsShipped(orderId) {
   return apiFetch(`/orders/${orderId}/shipped`, { method: 'PUT' });
 }
 
+export async function markOrderAsDelivered(orderId) {
+  return apiFetch(`/orders/${orderId}/seller-delivered`, { method: 'PUT' });
+}
+
 export async function checkPurchase(productId) {
   return apiFetch(`/orders/check-purchase/${productId}`);
 }
