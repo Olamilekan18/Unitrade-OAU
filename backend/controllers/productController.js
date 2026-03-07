@@ -6,7 +6,7 @@ const productService = new ProductService(supabase);
 class ProductController {
   static async createProduct(req, res, next) {
     try {
-      const { title, price, description, category_id, image_url } = req.body;
+      const { title, price, description, category_id, image_url, quantity } = req.body;
 
       const product = await productService.createProduct({
         title,
@@ -14,6 +14,7 @@ class ProductController {
         description,
         category_id,
         image_url,
+        quantity: quantity || 1,
         seller_id: req.user.id,
         status: 'available'
       });

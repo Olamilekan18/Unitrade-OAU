@@ -13,6 +13,8 @@ const ReviewService = require('./services/ReviewService');
 const NotificationService = require('./services/NotificationService');
 const EmailService = require('./services/EmailService');
 const ChatService = require('./services/ChatService');
+const OrderService = require('./services/OrderService');
+const UserReviewController = require('./controllers/userReviewController');
 const { errorHandler } = require('./middlewares/errorMiddleware');
 const { verifyJwt } = require('./middlewares/authMiddleware');
 
@@ -23,6 +25,7 @@ const reviewService = new ReviewService(supabase);
 const notificationService = new NotificationService(supabase);
 const emailService = new EmailService();
 const chatService = new ChatService(supabase);
+const orderService = new OrderService(supabase);
 
 // Allow local dev and Vercel deployed frontend
 const allowedOrigins = [
@@ -334,7 +337,8 @@ app.get('/api/conversations/:id/messages', verifyJwt, async (req, res, next) => 
 
 app.post('/api/conversations/:id/messages', verifyJwt, async (req, res, next) => {
   try {
-    const message = await chatService.sendMessage(req.params.id, req.user.id, req.body.content);
+    const { content, imageUrl, offerPrice } = req.body;
+    const message = await chatService.sendMessage(req.params.id, req.user.id, content, imageUrl, offerPrice);
     res.status(201).json({ success: true, data: message });
 
     // Send email notification in the background (don't block response)
@@ -392,6 +396,150 @@ app.put('/api/conversations/:id/read', verifyJwt, async (req, res, next) => {
     res.json({ success: true });
   } catch (error) {
     next(error);
+  }
+});
+
+app.put('/api/messages/:id/accept', verifyJwt, async (req, res, next) => {
+  try {
+    const message = await chatService.acceptOffer(req.params.id, req.user.id);
+    res.json({ success: true, data: message });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.put('/api/messages/:id/reject', verifyJwt, async (req, res, next) => {
+  try {
+    const message = await chatService.rejectOffer(req.params.id, req.user.id);
+    res.json({ success: true, data: message });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ── Orders & Payments ──
+app.post('/api/orders', verifyJwt, async (req, res, next) => {
+  try {
+    const result = await orderService.initializePayment(req.user.id, req.body.productId, req.body.offerId);
+    res.status(201).json({ success: true, data: result });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/orders', verifyJwt, async (req, res, next) => {
+  try {
+    const [purchases, sales] = await Promise.all([
+      orderService.getOrdersForBuyer(req.user.id),
+      orderService.getOrdersForSeller(req.user.id),
+    ]);
+    res.json({ success: true, data: { purchases, sales } });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/orders/check-purchase/:productId', verifyJwt, async (req, res, next) => {
+  try {
+    const hasPurchased = await orderService.hasPurchased(req.user.id, req.params.productId);
+    res.json({ success: true, data: { hasPurchased } });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ── User Reviews ──
+app.post('/api/users/:userId/reviews', verifyJwt, UserReviewController.createUserReview);
+
+app.post('/api/orders/verify-payment', verifyJwt, async (req, res, next) => {
+  try {
+    const order = await orderService.verifyPayment(req.body.reference);
+
+    // Send notifications in background
+    (async () => {
+      try {
+        const productTitle = order.products?.title || 'a product';
+        // Notify seller
+        await notificationService.create(
+          order.seller?.id,
+          'info',
+          `🎉 New order! ${order.buyer?.name || 'A buyer'} purchased "${productTitle}" for ₦${Number(order.amount).toLocaleString()}.`
+        );
+        // Notify buyer
+        await notificationService.create(
+          order.buyer?.id,
+          'info',
+          `✅ Payment confirmed! Your order for "${productTitle}" has been paid successfully.`
+        );
+        // Send emails
+        if (order.seller?.oau_email) {
+          await emailService.sendNewOrderEmail({
+            sellerEmail: order.seller.oau_email,
+            sellerName: order.seller.store_name || order.seller.name,
+            buyerName: order.buyer?.name || 'A buyer',
+            productTitle,
+            amount: order.amount,
+          });
+        }
+        if (order.buyer?.oau_email) {
+          await emailService.sendOrderConfirmationEmail({
+            buyerEmail: order.buyer.oau_email,
+            buyerName: order.buyer.name,
+            productTitle,
+            amount: order.amount,
+          });
+        }
+      } catch (emailErr) {
+        console.error('[Order Email] Failed:', emailErr.message);
+      }
+    })();
+
+    res.json({ success: true, data: order });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.put('/api/orders/:id/confirm', verifyJwt, async (req, res, next) => {
+  try {
+    const order = await orderService.confirmDelivery(req.params.id, req.user.id);
+    res.json({ success: true, data: order });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.delete('/api/orders/:id', verifyJwt, async (req, res, next) => {
+  try {
+    await orderService.deleteOrder(req.params.id, req.user.id);
+    res.json({ success: true, message: 'Order deleted successfully' });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ── Paystack Webhook (for edge cases) ──
+app.post('/api/webhooks/paystack', async (req, res) => {
+  try {
+    const crypto = require('crypto');
+    const hash = crypto
+      .createHmac('sha512', process.env.PAYSTACK_SECRET_KEY)
+      .update(JSON.stringify(req.body))
+      .digest('hex');
+
+    if (hash !== req.headers['x-paystack-signature']) {
+      return res.status(400).send('Invalid signature');
+    }
+
+    const event = req.body;
+    if (event.event === 'charge.success') {
+      await orderService.verifyPayment(event.data.reference);
+    }
+
+    res.sendStatus(200);
+  } catch (error) {
+    console.error('[Paystack Webhook]', error.message);
+    res.sendStatus(200); // Always return 200 to Paystack
   }
 });
 

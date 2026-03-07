@@ -14,10 +14,49 @@ class ReviewService {
             .order('created_at', { ascending: false });
 
         if (error) throw error;
-        return data;
+
+        // Check which reviewers have purchased the product
+        const reviewerIds = data.map(r => r.users?.id).filter(Boolean);
+
+        let purchaseMap = {};
+        if (reviewerIds.length > 0) {
+            const { data: orders } = await this.supabase
+                .from('orders')
+                .select('buyer_id')
+                .eq('product_id', productId)
+                .in('buyer_id', reviewerIds)
+                .in('status', ['paid', 'delivered']);
+
+            if (orders) {
+                orders.forEach(o => { purchaseMap[o.buyer_id] = true; });
+            }
+        }
+
+        // Attach verified_purchase flag to each review
+        return data.map(review => ({
+            ...review,
+            verified_purchase: !!(review.users?.id && purchaseMap[review.users.id]),
+        }));
     }
 
     async createReview(productId, reviewerId, payload) {
+        // ── Purchase verification: only buyers can review ──
+        const { data: orderCheck, error: orderErr } = await this.supabase
+            .from('orders')
+            .select('id')
+            .eq('buyer_id', reviewerId)
+            .eq('product_id', productId)
+            .in('status', ['paid', 'delivered'])
+            .limit(1);
+
+        if (orderErr) throw orderErr;
+
+        if (!orderCheck || orderCheck.length === 0) {
+            const err = new Error('You must purchase this product before leaving a review.');
+            err.status = 403;
+            throw err;
+        }
+
         const { data, error } = await this.supabase
             .from('reviews')
             .insert({
@@ -40,7 +79,8 @@ class ReviewService {
             }
             throw error;
         }
-        return data;
+
+        return { ...data, verified_purchase: true };
     }
 
     async getAverageRating(productId) {

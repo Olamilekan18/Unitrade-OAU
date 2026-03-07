@@ -61,7 +61,7 @@ class ChatService {
                 // Last message
                 const { data: lastMsg } = await this.supabase
                     .from('messages')
-                    .select('content, sender_id, created_at')
+                    .select('content, sender_id, image_url, offer_price, offer_status, created_at')
                     .eq('conversation_id', conv.id)
                     .order('created_at', { ascending: false })
                     .limit(1)
@@ -109,7 +109,7 @@ class ChatService {
 
         const { data, error } = await this.supabase
             .from('messages')
-            .select('id, conversation_id, sender_id, content, is_read, created_at')
+            .select('id, conversation_id, sender_id, content, image_url, offer_price, offer_status, is_read, created_at')
             .eq('conversation_id', conversationId)
             .order('created_at', { ascending: true });
 
@@ -118,8 +118,8 @@ class ChatService {
     }
 
     // Send a message
-    async sendMessage(conversationId, senderId, content) {
-        if (!content || !content.trim()) {
+    async sendMessage(conversationId, senderId, content, imageUrl = null, offerPrice = null) {
+        if ((!content || !content.trim()) && !imageUrl && !offerPrice) {
             const err = new Error('Message content cannot be empty');
             err.status = 400;
             throw err;
@@ -150,9 +150,12 @@ class ChatService {
             .insert({
                 conversation_id: conversationId,
                 sender_id: senderId,
-                content: content.trim(),
+                content: content ? content.trim() : '',
+                image_url: imageUrl,
+                offer_price: offerPrice ? Number(offerPrice) : null,
+                offer_status: offerPrice ? 'pending' : null
             })
-            .select('id, conversation_id, sender_id, content, is_read, created_at')
+            .select('id, conversation_id, sender_id, content, image_url, offer_price, offer_status, is_read, created_at')
             .single();
 
         if (error) throw error;
@@ -198,6 +201,89 @@ class ChatService {
             .eq('is_read', false);
 
         return count || 0;
+    }
+
+    // Accept an offer
+    async acceptOffer(messageId, userId) {
+        // Find the message
+        const { data: msg, error: msgErr } = await this.supabase
+            .from('messages')
+            .select('id, sender_id, offer_price, offer_status')
+            .eq('id', messageId)
+            .single();
+
+        if (msgErr || !msg) {
+            const err = new Error('Message not found');
+            err.status = 404;
+            throw err;
+        }
+
+        if (!msg.offer_price) {
+            const err = new Error('This message is not an offer');
+            err.status = 400;
+            throw err;
+        }
+
+        if (msg.sender_id === userId) {
+            const err = new Error('You cannot accept your own offer');
+            err.status = 403;
+            throw err;
+        }
+
+        if (msg.offer_status !== 'pending') {
+            const err = new Error('Offer has already been ' + msg.offer_status);
+            err.status = 400;
+            throw err;
+        }
+
+        // Accept it
+        const { data, error } = await this.supabase
+            .from('messages')
+            .update({ offer_status: 'accepted' })
+            .eq('id', messageId)
+            .select('*')
+            .single();
+
+        if (error) throw error;
+        return data;
+    }
+
+    // Reject an offer
+    async rejectOffer(messageId, userId) {
+        const { data: msg, error: msgErr } = await this.supabase
+            .from('messages')
+            .select('id, sender_id, offer_price, offer_status')
+            .eq('id', messageId)
+            .single();
+
+        if (msgErr || !msg) {
+            const err = new Error('Message not found');
+            err.status = 404;
+            throw err;
+        }
+
+        if (!msg.offer_price) {
+            const err = new Error('This message is not an offer');
+            err.status = 400;
+            throw err;
+        }
+
+        if (msg.sender_id === userId) {
+            const err = new Error('You cannot reject your own offer');
+            err.status = 403;
+            throw err;
+        }
+
+        // Reject it
+        const { data, error } = await this.supabase
+            .from('messages')
+            .update({ offer_status: 'rejected' })
+            .eq('id', messageId)
+            .select('*')
+            .single();
+
+        if (error) throw error;
+        return data;
     }
 }
 

@@ -125,6 +125,70 @@ class EmailService {
 
     await this.send(recipientEmail, 'New message from ' + senderName + ' on UniTrade', html);
   }
+
+  async sendOrderConfirmationEmail({ buyerEmail, buyerName, productTitle, amount }) {
+    const frontendUrl = process.env.FRONTEND_ORIGIN || 'http://localhost:5173';
+    const html = `
+      <div style="font-family: 'Inter', sans-serif; max-width: 520px; margin: auto; padding: 32px; background: #f0fdf4; border-radius: 16px;">
+        <div style="text-align: center; margin-bottom: 24px;">
+          <h1 style="color: #059669; margin: 0; font-size: 24px;">✅ Order Confirmed!</h1>
+        </div>
+        <div style="background: white; padding: 24px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+          <p style="color: #374151; font-size: 16px;">Hi <strong>${buyerName}</strong>,</p>
+          <p style="color: #6b7280; line-height: 1.6;">
+            Your payment for <strong>"${productTitle}"</strong> has been confirmed!
+          </p>
+          <div style="background: #f3f4f6; padding: 16px; border-radius: 8px; margin: 16px 0;">
+            <p style="margin: 0; color: #374151;"><strong>Amount:</strong> ₦${Number(amount).toLocaleString()}</p>
+          </div>
+          <p style="color: #6b7280; line-height: 1.6;">
+            Please arrange delivery with the seller via chat. Once you receive the item, confirm delivery on your Orders page.
+          </p>
+          <div style="text-align: center; margin: 24px 0;">
+            <a href="${frontendUrl}/orders"
+               style="display: inline-block; background: #059669; color: white; padding: 12px 32px;
+                      border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;">
+              View My Orders
+            </a>
+          </div>
+          <p style="color: #9ca3af; font-size: 13px; text-align: center;">— The UniTrade OAU Team</p>
+        </div>
+      </div>
+    `;
+    await this.send(buyerEmail, `✅ Order confirmed: "${productTitle}"`, html);
+  }
+
+  async sendNewOrderEmail({ sellerEmail, sellerName, buyerName, productTitle, amount }) {
+    const frontendUrl = process.env.FRONTEND_ORIGIN || 'http://localhost:5173';
+    const html = `
+      <div style="font-family: 'Inter', sans-serif; max-width: 520px; margin: auto; padding: 32px; background: #fefce8; border-radius: 16px;">
+        <div style="text-align: center; margin-bottom: 24px;">
+          <h1 style="color: #ca8a04; margin: 0; font-size: 24px;">🎉 New Sale!</h1>
+        </div>
+        <div style="background: white; padding: 24px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+          <p style="color: #374151; font-size: 16px;">Hi <strong>${sellerName}</strong>,</p>
+          <p style="color: #6b7280; line-height: 1.6;">
+            <strong>${buyerName}</strong> just purchased your product <strong>"${productTitle}"</strong>!
+          </p>
+          <div style="background: #f3f4f6; padding: 16px; border-radius: 8px; margin: 16px 0;">
+            <p style="margin: 0; color: #374151;"><strong>Amount:</strong> ₦${Number(amount).toLocaleString()}</p>
+          </div>
+          <p style="color: #6b7280; line-height: 1.6;">
+            Please arrange delivery with the buyer. You can chat with them on UniTrade.
+          </p>
+          <div style="text-align: center; margin: 24px 0;">
+            <a href="${frontendUrl}/orders"
+               style="display: inline-block; background: #ca8a04; color: white; padding: 12px 32px;
+                      border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;">
+              View Orders
+            </a>
+          </div>
+          <p style="color: #9ca3af; font-size: 13px; text-align: center;">— The UniTrade OAU Team</p>
+        </div>
+      </div>
+    `;
+    await this.send(sellerEmail, `🎉 New sale: "${productTitle}"`, html);
+  }
 }
 
 module.exports = EmailService;
