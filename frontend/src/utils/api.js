@@ -205,10 +205,47 @@ export async function confirmDelivery(orderId) {
   return apiFetch(`/orders/${orderId}/confirm`, { method: 'PUT' });
 }
 
+export async function markOrderAsShipped(orderId) {
+  return apiFetch(`/orders/${orderId}/shipped`, { method: 'PUT' });
+}
+
 export async function checkPurchase(productId) {
   return apiFetch(`/orders/check-purchase/${productId}`);
 }
 
 export async function deleteOrder(orderId) {
   return apiFetch(`/orders/${orderId}`, { method: 'DELETE' });
+}
+
+/* ── Wallet & Withdrawals ── */
+export async function fetchWalletDetails() {
+  return apiFetch('/wallet');
+}
+
+export async function fetchBanks() {
+  return apiFetch('/wallet/banks');
+}
+
+export async function resolveBankAccount(accountNumber, bankCode) {
+  return apiFetch('/wallet/resolve', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ accountNumber, bankCode }),
+  });
+}
+
+export async function updateBankDetails(data) {
+  return apiFetch('/wallet/bank', {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+}
+
+export async function requestWithdrawal(amount) {
+  return apiFetch('/wallet/withdraw', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ amount }),
+  });
 }

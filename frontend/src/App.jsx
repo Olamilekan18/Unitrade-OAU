@@ -12,6 +12,7 @@ import UserProfilePage from './pages/UserProfilePage';
 import ProductDetailPage from './pages/ProductDetailPage';
 import ChatPage from './pages/ChatPage';
 import OrdersPage from './pages/OrdersPage';
+import WalletPage from './pages/WalletPage';
 
 function AppContent() {
   const location = useLocation();
@@ -30,6 +31,7 @@ function AppContent() {
         <Route path="/users/:id" element={<UserProfilePage />} />
         <Route path="/product/:id" element={<ProductDetailPage />} />
         <Route path="/orders" element={<OrdersPage />} />
+        <Route path="/wallet" element={<WalletPage />} />
         <Route path="/chat" element={<ChatPage />} />
       </Routes>
       {!hideFooter && <Footer />}

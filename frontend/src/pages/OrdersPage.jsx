@@ -5,11 +5,12 @@ import {
     FaTruck, FaTimesCircle, FaArrowLeft, FaBoxOpen, FaTrash, FaStar
 } from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext';
-import { fetchOrders, confirmDelivery, deleteOrder, createUserReview } from '../utils/api';
+import { fetchOrders, confirmDelivery, markOrderAsShipped, deleteOrder, createUserReview } from '../utils/api';
 
 const STATUS_CONFIG = {
     pending: { label: 'Pending', icon: <FaClock />, className: 'status-pending' },
-    paid: { label: 'Paid', icon: <FaTruck />, className: 'status-paid' },
+    paid: { label: 'Paid', icon: <FaBoxOpen />, className: 'status-paid' },
+    shipped: { label: 'Shipped', icon: <FaTruck />, className: 'status-paid' },
     delivered: { label: 'Delivered', icon: <FaCheckCircle />, className: 'status-delivered' },
     cancelled: { label: 'Cancelled', icon: <FaTimesCircle />, className: 'status-cancelled' },
 };
@@ -23,6 +24,7 @@ function OrdersPage() {
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
     const [confirmingId, setConfirmingId] = useState(null);
+    const [shippingId, setShippingId] = useState(null);
     const [deletingId, setDeletingId] = useState(null);
 
     const [showRatingModal, setShowRatingModal] = useState(false);
@@ -67,9 +69,23 @@ function OrdersPage() {
         }
     }
 
+    async function handleMarkShipped(orderId) {
+        try {
+            setShippingId(orderId);
+            await markOrderAsShipped(orderId);
+            setSales((prev) =>
+                prev.map((o) => (o.id === orderId ? { ...o, status: 'shipped' } : o))
+            );
+        } catch (err) {
+            alert(err.message);
+        } finally {
+            setShippingId(null);
+        }
+    }
+
     async function handleDeleteOrder(orderId) {
         if (!window.confirm("Are you sure you want to delete this order? This will reset the product to available.")) return;
-        
+
         try {
             setDeletingId(orderId);
             await deleteOrder(orderId);
@@ -171,6 +187,7 @@ function OrdersPage() {
                                 order={order}
                                 type={activeTab}
                                 onConfirmDelivery={handleConfirmDelivery}
+                                onMarkShipped={handleMarkShipped}
                                 onDeleteOrder={handleDeleteOrder}
                                 onRateSeller={(order) => {
                                     setRatingOrder(order);
@@ -179,6 +196,7 @@ function OrdersPage() {
                                     setShowRatingModal(true);
                                 }}
                                 confirmingId={confirmingId}
+                                shippingId={shippingId}
                                 deletingId={deletingId}
                             />
                         ))
@@ -222,7 +240,7 @@ function OrdersPage() {
     );
 }
 
-function OrderCard({ order, type, onConfirmDelivery, onDeleteOrder, onRateSeller, confirmingId, deletingId }) {
+function OrderCard({ order, type, onConfirmDelivery, onMarkShipped, onDeleteOrder, onRateSeller, confirmingId, shippingId, deletingId }) {
     const product = order.products || {};
     const otherUser = type === 'purchases' ? order.seller : order.buyer;
     const config = STATUS_CONFIG[order.status] || STATUS_CONFIG.pending;
@@ -281,7 +299,7 @@ function OrderCard({ order, type, onConfirmDelivery, onDeleteOrder, onRateSeller
 
                 {/* Actions */}
                 <div className="order-card-actions">
-                    {type === 'purchases' && order.status === 'paid' && (
+                    {type === 'purchases' && (order.status === 'paid' || order.status === 'shipped') && (
                         <button
                             className="btn btn-primary"
                             onClick={() => onConfirmDelivery(order.id)}
@@ -291,6 +309,18 @@ function OrderCard({ order, type, onConfirmDelivery, onDeleteOrder, onRateSeller
                             {confirmingId === order.id
                                 ? <><FaSpinner className="spinner" /> Confirming...</>
                                 : <><FaCheckCircle /> Confirm Delivery</>}
+                        </button>
+                    )}
+                    {type === 'sales' && order.status === 'paid' && (
+                        <button
+                            className="btn btn-primary"
+                            onClick={() => onMarkShipped(order.id)}
+                            disabled={shippingId === order.id}
+                            style={{ fontSize: '0.8rem', padding: '8px 16px', whiteSpace: 'nowrap' }}
+                        >
+                            {shippingId === order.id
+                                ? <><FaSpinner className="spinner" /> Marking...</>
+                                : <><FaTruck /> Mark as Shipped</>}
                         </button>
                     )}
                     {type === 'purchases' && order.status === 'delivered' && (
@@ -311,16 +341,16 @@ function OrderCard({ order, type, onConfirmDelivery, onDeleteOrder, onRateSeller
                             </button>
                         </div>
                     )}
-                    
+
                     {/* Delete Support (Test purposes) */}
                     {type === 'purchases' && (
                         <button
                             className="btn btn-outline"
                             onClick={() => onDeleteOrder(order.id)}
                             disabled={deletingId === order.id}
-                            style={{ 
+                            style={{
                                 fontSize: '0.8rem', padding: '8px 16px', whiteSpace: 'nowrap',
-                                color: 'var(--color-error, #dc2626)', borderColor: '#f87171' 
+                                color: 'var(--color-error, #dc2626)', borderColor: '#f87171'
                             }}
                         >
                             {deletingId === order.id
