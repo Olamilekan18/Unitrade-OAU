@@ -14,7 +14,9 @@ const NotificationService = require('./services/NotificationService');
 const EmailService = require('./services/EmailService');
 const ChatService = require('./services/ChatService');
 const OrderService = require('./services/OrderService');
+const WalletService = require('./services/WalletService');
 const UserReviewController = require('./controllers/userReviewController');
+const cron = require('node-cron');
 const { errorHandler } = require('./middlewares/errorMiddleware');
 const { verifyJwt } = require('./middlewares/authMiddleware');
 
@@ -26,6 +28,13 @@ const notificationService = new NotificationService(supabase);
 const emailService = new EmailService();
 const chatService = new ChatService(supabase);
 const orderService = new OrderService(supabase);
+const walletService = new WalletService(supabase);
+
+// --- Background Job For Escrow Auto Releases ---
+// Run every hour to check for 24-hours expired shipped orders
+cron.schedule('0 * * * *', () => {
+  orderService.processAutoReleases();
+});
 
 // Allow local dev and Vercel deployed frontend
 const allowedOrigins = [
@@ -417,7 +426,7 @@ app.put('/api/messages/:id/reject', verifyJwt, async (req, res, next) => {
   }
 });
 
-// ── Orders & Payments ──
+// ── Orders & Escrow ──
 app.post('/api/orders', verifyJwt, async (req, res, next) => {
   try {
     const result = await orderService.initializePayment(req.user.id, req.body.productId, req.body.offerId);
@@ -500,6 +509,15 @@ app.post('/api/orders/verify-payment', verifyJwt, async (req, res, next) => {
   }
 });
 
+app.put('/api/orders/:id/shipped', verifyJwt, async (req, res, next) => {
+  try {
+    const order = await orderService.markAsShipped(req.params.id, req.user.id);
+    res.json({ success: true, data: order });
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.put('/api/orders/:id/confirm', verifyJwt, async (req, res, next) => {
   try {
     const order = await orderService.confirmDelivery(req.params.id, req.user.id);
@@ -513,6 +531,54 @@ app.delete('/api/orders/:id', verifyJwt, async (req, res, next) => {
   try {
     await orderService.deleteOrder(req.params.id, req.user.id);
     res.json({ success: true, message: 'Order deleted successfully' });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ── Wallet & Withdrawals ──
+app.get('/api/wallet', verifyJwt, async (req, res, next) => {
+  try {
+    const data = await walletService.getWalletDetails(req.user.id);
+    res.json({ success: true, data });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.get('/api/wallet/banks', verifyJwt, async (req, res, next) => {
+  try {
+    const banks = await walletService.getBanks();
+    res.json({ success: true, data: banks });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/api/wallet/resolve', verifyJwt, async (req, res, next) => {
+  try {
+    const { accountNumber, bankCode } = req.body;
+    const account = await walletService.resolveAccount(accountNumber, bankCode);
+    res.json({ success: true, data: account });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.put('/api/wallet/bank', verifyJwt, async (req, res, next) => {
+  try {
+    const data = await walletService.updateBankDetails(req.user.id, req.body);
+    res.json({ success: true, data });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/api/wallet/withdraw', verifyJwt, async (req, res, next) => {
+  try {
+    const { amount } = req.body;
+    const withdrawal = await walletService.requestWithdrawal(req.user.id, amount);
+    res.status(201).json({ success: true, data: withdrawal });
   } catch (error) {
     next(error);
   }

@@ -244,12 +244,12 @@ class OrderService {
   }
 
   /**
-   * Buyer confirms delivery
+   * Seller marks order as shipped, starting the 24-hour countdown
    */
-  async confirmDelivery(orderId, buyerId) {
+  async markAsShipped(orderId, sellerId) {
     const { data: order, error: findErr } = await this.supabase
       .from('orders')
-      .select('id, status, buyer_id')
+      .select('id, status, seller_id')
       .eq('id', orderId)
       .single();
 
@@ -259,14 +259,55 @@ class OrderService {
       throw err;
     }
 
-    if (order.buyer_id !== buyerId) {
-      const err = new Error('Only the buyer can confirm delivery.');
+    if (order.seller_id !== sellerId) {
+      const err = new Error('Only the seller can mark this order as shipped.');
       err.status = 403;
       throw err;
     }
 
     if (order.status !== 'paid') {
-      const err = new Error('Order must be in "paid" status to confirm delivery.');
+      const err = new Error('Order must be in "paid" status to mark as shipped.');
+      err.status = 400;
+      throw err;
+    }
+
+    const { data: updated, error: updateErr } = await this.supabase
+      .from('orders')
+      .update({ status: 'shipped', updated_at: new Date().toISOString() })
+      .eq('id', orderId)
+      .select(`
+        id, amount, status, created_at, updated_at
+      `)
+      .single();
+
+    if (updateErr) throw updateErr;
+    return updated;
+  }
+
+  /**
+   * Buyer confirms delivery (or system auto-confirms), which credits the seller's wallet
+   */
+  async confirmDelivery(orderId, buyerId = null, isAuto = false) {
+    const { data: order, error: findErr } = await this.supabase
+      .from('orders')
+      .select('id, status, buyer_id, seller_id, amount')
+      .eq('id', orderId)
+      .single();
+
+    if (findErr || !order) {
+      const err = new Error('Order not found.');
+      err.status = 404;
+      throw err;
+    }
+
+    if (!isAuto && order.buyer_id !== buyerId) {
+      const err = new Error('Only the buyer can confirm delivery.');
+      err.status = 403;
+      throw err;
+    }
+
+    if (order.status !== 'paid' && order.status !== 'shipped') {
+      const err = new Error('Order must be in "paid" or "shipped" status to confirm delivery.');
       err.status = 400;
       throw err;
     }
@@ -282,7 +323,63 @@ class OrderService {
       .single();
 
     if (updateErr) throw updateErr;
+
+    // Credit the seller's wallet
+    const { data: seller, error: sellerErr } = await this.supabase
+      .from('users')
+      .select('wallet_balance')
+      .eq('id', order.seller_id)
+      .single();
+
+    if (!sellerErr && seller) {
+      const newBalance = Number(seller.wallet_balance) + Number(order.amount);
+      await this.supabase
+        .from('users')
+        .update({ wallet_balance: newBalance })
+        .eq('id', order.seller_id);
+    }
+
     return updated;
+  }
+
+  /**
+   * Process 24-hour auto-releases for shipped orders
+   */
+  async processAutoReleases() {
+    console.log('[Cron] Checking for shipped orders older than 24 hours...');
+
+    // Calculate timestamp for 24 hours ago
+    const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
+
+    const { data: orders, error: fetchErr } = await this.supabase
+      .from('orders')
+      .select('id')
+      .eq('status', 'shipped')
+      .lt('updated_at', twentyFourHoursAgo);
+
+    if (fetchErr) {
+      console.error('[Cron] Error fetching shipped orders:', fetchErr);
+      return;
+    }
+
+    if (!orders || orders.length === 0) {
+      console.log('[Cron] No orders require auto-release at this time.');
+      return;
+    }
+
+    console.log(`[Cron] Found ${orders.length} orders to auto-release.`);
+
+    let successCount = 0;
+    for (const order of orders) {
+      try {
+        await this.confirmDelivery(order.id, null, true);
+        successCount++;
+      } catch (err) {
+        console.error(`[Cron] Failed to auto-release order ${order.id}:`, err.message);
+      }
+    }
+
+    console.log(`[Cron] Successfully auto-released ${successCount}/${orders.length} orders.`);
   }
 
   /**
@@ -343,14 +440,14 @@ class OrderService {
       if (product) {
         await this.supabase
           .from('products')
-          .update({ 
-            quantity: product.quantity + 1, 
-            status: 'available' 
+          .update({
+            quantity: product.quantity + 1,
+            status: 'available'
           })
           .eq('id', order.product_id);
       }
     }
-    
+
     return true;
   }
 }
