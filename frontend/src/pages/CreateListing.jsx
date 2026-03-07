@@ -8,6 +8,7 @@ function CreateListing() {
   const [form, setForm] = useState({
     title: '',
     price: '',
+    quantity: 1,
     description: '',
     category_id: '',
     image_url: '',
@@ -112,10 +113,11 @@ function CreateListing() {
       await createListing({
         ...form,
         price: Number(form.price),
+        quantity: Math.max(1, Number(form.quantity) || 1),
         category_id: Number(form.category_id),
       });
       setMessage({ type: 'success', text: 'Listing published successfully!' });
-      setForm({ title: '', price: '', description: '', category_id: '', image_url: '' });
+      setForm({ title: '', price: '', quantity: 1, description: '', category_id: '', image_url: '' });
       setPreviewUrl('');
     } catch (error) {
       setMessage({ type: 'error', text: error.message });
@@ -180,6 +182,21 @@ function CreateListing() {
                 className="input"
                 placeholder="e.g. 3500"
                 value={form.price}
+                onChange={handleChange}
+                required
+              />
+            </div>
+
+            <div className="input-group">
+              <label htmlFor="quantity">Quantity Available</label>
+              <input
+                id="quantity"
+                name="quantity"
+                type="number"
+                min="1"
+                className="input"
+                placeholder="e.g. 1"
+                value={form.quantity}
                 onChange={handleChange}
                 required
               />

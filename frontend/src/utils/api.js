@@ -113,6 +113,14 @@ export async function createReview(productId, data) {
   });
 }
 
+export async function createUserReview(userId, data) {
+  return apiFetch(`/users/${userId}/reviews`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(data),
+  });
+}
+
 /* ── Verification ── */
 export async function requestVerification(reason) {
   return apiFetch('/verification-requests', {
@@ -152,14 +160,55 @@ export async function fetchMessages(conversationId) {
   return apiFetch(`/conversations/${conversationId}/messages`);
 }
 
-export async function sendMessage(conversationId, content) {
+export async function sendMessage(conversationId, content, imageUrl = null, offerPrice = null) {
   return apiFetch(`/conversations/${conversationId}/messages`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ content }),
+    body: JSON.stringify({ content, imageUrl, offerPrice }),
   });
+}
+
+export async function acceptOffer(messageId) {
+  return apiFetch(`/messages/${messageId}/accept`, { method: 'PUT' });
+}
+
+export async function rejectOffer(messageId) {
+  return apiFetch(`/messages/${messageId}/reject`, { method: 'PUT' });
 }
 
 export async function markConversationRead(conversationId) {
   return apiFetch(`/conversations/${conversationId}/read`, { method: 'PUT' });
+}
+
+/* ── Orders ── */
+export async function createOrder(productId, offerId = null) {
+  return apiFetch('/orders', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ productId, offerId }),
+  });
+}
+
+export async function verifyPayment(reference) {
+  return apiFetch('/orders/verify-payment', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ reference }),
+  });
+}
+
+export async function fetchOrders() {
+  return apiFetch('/orders');
+}
+
+export async function confirmDelivery(orderId) {
+  return apiFetch(`/orders/${orderId}/confirm`, { method: 'PUT' });
+}
+
+export async function checkPurchase(productId) {
+  return apiFetch(`/orders/check-purchase/${productId}`);
+}
+
+export async function deleteOrder(orderId) {
+  return apiFetch(`/orders/${orderId}`, { method: 'DELETE' });
 }

@@ -3,7 +3,7 @@ import { Link, NavLink, useNavigate } from 'react-router-dom';
 import {
     FaBars, FaTimes, FaShoppingBag, FaSignOutAlt, FaPlus,
     FaUserCircle, FaBell, FaCheckCircle, FaShieldAlt, FaInfoCircle, FaStar,
-    FaCommentDots,
+    FaCommentDots, FaBoxOpen,
 } from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext';
 import { fetchNotifications, markAllNotificationsRead, fetchConversations } from '../utils/api';
@@ -120,6 +120,9 @@ function Navbar() {
                             </NavLink>
                             <NavLink to="/profile" onClick={closeMenu}>
                                 <FaUserCircle style={{ marginRight: 4 }} /> Profile
+                            </NavLink>
+                            <NavLink to="/orders" onClick={closeMenu}>
+                                <FaBoxOpen style={{ marginRight: 4 }} /> My Orders
                             </NavLink>
 
                             {/* Chat Icon */}

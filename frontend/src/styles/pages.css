@@ -839,3 +839,256 @@
 .skeleton-card .skeleton-line-medium {
     width: 80%;
 }
+
+/* ─────────────────────────────────
+   ORDERS PAGE
+   ───────────────────────────────── */
+.orders-page {
+    padding: var(--space-8) 0 var(--space-16);
+    min-height: calc(100vh - var(--nav-height));
+    background: linear-gradient(180deg, var(--color-primary-50) 0%, var(--color-gray-50) 100%);
+}
+
+.orders-tabs {
+    display: flex;
+    gap: var(--space-2);
+    margin-bottom: var(--space-6);
+    background: white;
+    padding: var(--space-1);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+}
+
+.orders-tab {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: var(--space-2);
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radius-md);
+    border: none;
+    background: transparent;
+    color: var(--color-gray-500);
+    font-weight: 600;
+    font-size: var(--font-size-sm);
+    cursor: pointer;
+    transition: all var(--transition-fast);
+}
+
+.orders-tab:hover {
+    color: var(--color-primary);
+    background: var(--color-primary-50);
+}
+
+.orders-tab.active {
+    background: var(--color-primary);
+    color: white;
+    box-shadow: var(--shadow-md);
+}
+
+.orders-tab-count {
+    background: rgba(255, 255, 255, 0.3);
+    padding: 1px 8px;
+    border-radius: var(--radius-full);
+    font-size: var(--font-size-xs);
+    font-weight: 700;
+}
+
+.orders-tab.active .orders-tab-count {
+    background: rgba(255, 255, 255, 0.3);
+}
+
+.orders-tab:not(.active) .orders-tab-count {
+    background: var(--color-gray-200);
+    color: var(--color-gray-600);
+}
+
+/* ── Order Card ── */
+.order-card {
+    background: white;
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-sm);
+    border: 1px solid var(--color-gray-100);
+    transition: all var(--transition-base);
+    overflow: hidden;
+}
+
+.order-card:hover {
+    box-shadow: var(--shadow-md);
+    border-color: var(--color-primary-200);
+}
+
+.order-card-inner {
+    display: flex;
+    align-items: center;
+    gap: var(--space-4);
+    padding: var(--space-4);
+}
+
+.order-card-image {
+    flex-shrink: 0;
+    width: 90px;
+    height: 90px;
+    border-radius: var(--radius-md);
+    overflow: hidden;
+}
+
+.order-card-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.order-card-info {
+    flex: 1;
+    min-width: 0;
+    display: flex;
+    flex-direction: column;
+    gap: var(--space-1);
+}
+
+.order-card-title {
+    font-weight: 700;
+    color: var(--color-gray-800);
+    text-decoration: none;
+    font-size: var(--font-size-base);
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+}
+
+.order-card-title:hover {
+    color: var(--color-primary);
+}
+
+.order-card-amount {
+    font-weight: 800;
+    color: var(--color-primary);
+    font-size: var(--font-size-lg);
+}
+
+.order-card-user {
+    display: flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-size: var(--font-size-xs);
+    color: var(--color-gray-500);
+}
+
+.order-card-avatar {
+    width: 22px;
+    height: 22px;
+    border-radius: 50%;
+    object-fit: cover;
+}
+
+.order-card-meta {
+    display: flex;
+    align-items: center;
+    gap: var(--space-3);
+    flex-wrap: wrap;
+}
+
+.order-card-date {
+    font-size: var(--font-size-xs);
+    color: var(--color-gray-400);
+}
+
+.order-card-actions {
+    flex-shrink: 0;
+}
+
+/* ── Order Status Badges ── */
+.order-status-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 3px 10px;
+    border-radius: var(--radius-full);
+    font-size: var(--font-size-xs);
+    font-weight: 600;
+    white-space: nowrap;
+}
+
+.status-pending {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.status-paid {
+    background: #dbeafe;
+    color: #1e40af;
+}
+
+.status-delivered {
+    background: var(--color-primary-100);
+    color: var(--color-primary-dark);
+}
+
+.status-cancelled {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+/* ── Buy Now Button ── */
+.buy-now-btn {
+    background: linear-gradient(135deg, var(--color-primary), var(--color-accent)) !important;
+    color: white !important;
+    border: none !important;
+    font-weight: 700;
+    font-size: var(--font-size-base) !important;
+    padding: var(--space-4) var(--space-8) !important;
+    border-radius: var(--radius-md);
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    transition: all var(--transition-base);
+    box-shadow: 0 4px 14px rgba(5, 150, 105, 0.4);
+}
+
+.buy-now-btn:hover:not(:disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(5, 150, 105, 0.5);
+}
+
+.buy-now-btn:disabled {
+    opacity: 0.7;
+    cursor: not-allowed;
+}
+
+/* ── Verified Purchase Badge ── */
+.verified-purchase-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 3px;
+    padding: 1px 8px;
+    border-radius: var(--radius-full);
+    background: var(--color-primary-50);
+    color: var(--color-primary-dark);
+    font-size: 0.65rem;
+    font-weight: 600;
+    letter-spacing: 0.02em;
+}
+
+@media (max-width: 640px) {
+    .order-card-inner {
+        flex-direction: column;
+        align-items: flex-start;
+    }
+
+    .order-card-image {
+        width: 100%;
+        height: 160px;
+    }
+
+    .order-card-actions {
+        width: 100%;
+    }
+
+    .order-card-actions .btn {
+        width: 100%;
+    }
+}
