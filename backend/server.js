@@ -518,6 +518,15 @@ app.put('/api/orders/:id/shipped', verifyJwt, async (req, res, next) => {
   }
 });
 
+app.put('/api/orders/:id/seller-delivered', verifyJwt, async (req, res, next) => {
+  try {
+    const order = await orderService.markAsSellerDelivered(req.params.id, req.user.id);
+    res.json({ success: true, data: order });
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.put('/api/orders/:id/confirm', verifyJwt, async (req, res, next) => {
   try {
     const order = await orderService.confirmDelivery(req.params.id, req.user.id);

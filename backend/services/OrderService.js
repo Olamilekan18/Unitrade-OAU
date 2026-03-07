@@ -285,6 +285,47 @@ class OrderService {
   }
 
   /**
+   * Seller marks order as delivered (starts 24-hour countdown)
+   */
+  async markAsSellerDelivered(orderId, sellerId) {
+    const { data: order, error: findErr } = await this.supabase
+      .from('orders')
+      .select('id, status, seller_id')
+      .eq('id', orderId)
+      .single();
+
+    if (findErr || !order) {
+      const err = new Error('Order not found.');
+      err.status = 404;
+      throw err;
+    }
+
+    if (order.seller_id !== sellerId) {
+      const err = new Error('Only the seller can mark this order as delivered.');
+      err.status = 403;
+      throw err;
+    }
+
+    if (order.status !== 'shipped' && order.status !== 'paid') {
+      const err = new Error('Order must be in "paid" or "shipped" status to mark as delivered.');
+      err.status = 400;
+      throw err;
+    }
+
+    const { data: updated, error: updateErr } = await this.supabase
+      .from('orders')
+      .update({ status: 'seller_delivered', updated_at: new Date().toISOString() })
+      .eq('id', orderId)
+      .select(`
+        id, amount, status, created_at, updated_at
+      `)
+      .single();
+
+    if (updateErr) throw updateErr;
+    return updated;
+  }
+
+  /**
    * Buyer confirms delivery (or system auto-confirms), which credits the seller's wallet
    */
   async confirmDelivery(orderId, buyerId = null, isAuto = false) {
@@ -306,8 +347,8 @@ class OrderService {
       throw err;
     }
 
-    if (order.status !== 'paid' && order.status !== 'shipped') {
-      const err = new Error('Order must be in "paid" or "shipped" status to confirm delivery.');
+    if (order.status !== 'paid' && order.status !== 'shipped' && order.status !== 'seller_delivered') {
+      const err = new Error('Order must be paid, shipped, or seller_delivered to confirm delivery.');
       err.status = 400;
       throw err;
     }
@@ -343,10 +384,10 @@ class OrderService {
   }
 
   /**
-   * Process 24-hour auto-releases for shipped orders
+   * Process 24-hour auto-releases for 'seller_delivered' orders
    */
   async processAutoReleases() {
-    console.log('[Cron] Checking for shipped orders older than 24 hours...');
+    console.log('[Cron] Checking for seller_delivered orders older than 24 hours...');
 
     // Calculate timestamp for 24 hours ago
     const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000).toISOString();
@@ -354,11 +395,11 @@ class OrderService {
     const { data: orders, error: fetchErr } = await this.supabase
       .from('orders')
       .select('id')
-      .eq('status', 'shipped')
+      .eq('status', 'seller_delivered')
       .lt('updated_at', twentyFourHoursAgo);
 
     if (fetchErr) {
-      console.error('[Cron] Error fetching shipped orders:', fetchErr);
+      console.error('[Cron] Error fetching seller_delivered orders:', fetchErr);
       return;
     }
 
