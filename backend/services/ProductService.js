@@ -10,7 +10,7 @@ class ProductService {
       .select(`
         id, title, price, description, image_url, status, quantity, created_at,
         categories:category_id(id, name),
-        users:seller_id(id, name, department, store_name, is_verified, avatar_url, address, user_reviews(rating)),
+        users:seller_id(id, name, department, store_name, is_verified, avatar_url, address, user_reviews!user_reviews_seller_id_fkey(rating)),
         reviews(rating)
       `)
       .single();
@@ -25,7 +25,7 @@ class ProductService {
       .select(`
         id, title, price, description, image_url, status, quantity, created_at,
         categories:category_id(id, name),
-        users:seller_id(id, name, department, store_name, is_verified, avatar_url, address, user_reviews(rating)),
+        users:seller_id(id, name, department, store_name, is_verified, avatar_url, address, user_reviews!user_reviews_seller_id_fkey(rating)),
         reviews(rating)
       `)
       .eq('status', 'available')
@@ -41,7 +41,7 @@ class ProductService {
       .select(`
         id, title, price, description, image_url, status, quantity, created_at,
         categories:category_id(id, name),
-        users:seller_id(id, name, department, store_name, is_verified, avatar_url, phone, address, user_reviews(rating)),
+        users:seller_id(id, name, department, store_name, is_verified, avatar_url, phone, address, user_reviews!user_reviews_seller_id_fkey(rating)),
         reviews(rating)
       `)
       .eq('id', id)
