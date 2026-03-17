@@ -29,7 +29,7 @@ class UserService {
   async authenticateUser(email, password) {
     const { data, error } = await this.supabase
       .from('users')
-      .select('id, name, oau_email, department, access_status, password_hash, bio, phone, address, avatar_url, store_name, is_verified')
+      .select('id, name, oau_email, department, access_status, password_hash, bio, phone, address, avatar_url, store_name, is_verified, role, is_blocked, suspended_until')
       .eq('oau_email', email)
       .maybeSingle();
 
@@ -54,6 +54,18 @@ class UserService {
       throw err;
     }
 
+    if (data.is_blocked) {
+      const err = new Error('Your account has been blocked.');
+      err.status = 403;
+      throw err;
+    }
+
+    if (data.suspended_until && new Date(data.suspended_until) > new Date()) {
+      const err = new Error('Your account is currently suspended.');
+      err.status = 403;
+      throw err;
+    }
+
     // Don't send password_hash to the client
     const { password_hash: _, ...user } = data;
     return user;
@@ -62,7 +74,7 @@ class UserService {
   async getApprovedUserById(id) {
     const { data, error } = await this.supabase
       .from('users')
-      .select('id, name, oau_email, department, access_status, bio, phone, address, avatar_url, store_name, is_verified')
+      .select('id, name, oau_email, department, access_status, bio, phone, address, avatar_url, store_name, is_verified, role, is_blocked, suspended_until')
       .eq('id', id)
       .maybeSingle();
 
@@ -76,6 +88,18 @@ class UserService {
 
     if (data.access_status !== 'approved') {
       const err = new Error('Your access request is still pending approval.');
+      err.status = 403;
+      throw err;
+    }
+
+    if (data.is_blocked) {
+      const err = new Error('Your account has been blocked.');
+      err.status = 403;
+      throw err;
+    }
+
+    if (data.suspended_until && new Date(data.suspended_until) > new Date()) {
+      const err = new Error('Your account is currently suspended.');
       err.status = 403;
       throw err;
     }
@@ -123,7 +147,7 @@ class UserService {
     return data;
   }
 
-  async requestVerification(userId, reason) {
+  async requestVerification(userId, reason, proofUrl) {
     const { data: existing } = await this.supabase
       .from('verification_requests')
       .select('id')
@@ -139,8 +163,8 @@ class UserService {
 
     const { data, error } = await this.supabase
       .from('verification_requests')
-      .insert({ user_id: userId, reason })
-      .select('id, reason, status, created_at')
+      .insert({ user_id: userId, reason, proof_url: proofUrl || '' })
+      .select('id, reason, proof_url, status, created_at')
       .single();
 
     if (error) throw error;

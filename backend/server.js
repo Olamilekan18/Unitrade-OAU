@@ -7,6 +7,8 @@ const jwt = require('jsonwebtoken');
 const supabase = require('./config/supabaseClient');
 const productRoutes = require('./routes/productRoutes');
 const uploadRoutes = require('./routes/uploadRoutes');
+const bidRoutes = require('./routes/bidRoutes');
+const adminRoutes = require('./routes/adminRoutes');
 const UserService = require('./services/UserService');
 const CategoryService = require('./services/CategoryService');
 const ReviewService = require('./services/ReviewService');
@@ -15,10 +17,12 @@ const EmailService = require('./services/EmailService');
 const ChatService = require('./services/ChatService');
 const OrderService = require('./services/OrderService');
 const WalletService = require('./services/WalletService');
+const AuditService = require('./services/AuditService');
+const PromoService = require('./services/PromoService');
 const UserReviewController = require('./controllers/userReviewController');
 const cron = require('node-cron');
 const { errorHandler } = require('./middlewares/errorMiddleware');
-const { verifyJwt } = require('./middlewares/authMiddleware');
+const { verifyJwt, requireAdmin } = require('./middlewares/authMiddleware');
 
 const app = express();
 const userService = new UserService(supabase);
@@ -29,11 +33,19 @@ const emailService = new EmailService();
 const chatService = new ChatService(supabase);
 const orderService = new OrderService(supabase);
 const walletService = new WalletService(supabase);
+const auditService = new AuditService(supabase);
+const promoService = new PromoService(supabase);
 
 // --- Background Job For Escrow Auto Releases ---
 // Run every hour to check for 24-hours expired shipped orders
 cron.schedule('0 * * * *', () => {
   orderService.processAutoReleases();
+});
+
+// --- Daily Promotion Batch Sender (Brevo) ---
+// Sends up to 300 queued promo emails per day
+cron.schedule('0 9 * * *', () => {
+  promoService.sendPendingBatch(300);
 });
 
 // Allow local dev and Vercel deployed frontend
@@ -107,6 +119,12 @@ app.post('/api/webhooks/user-approved', async (req, res) => {
 app.post('/api/access-requests', async (req, res, next) => {
   try {
     const request = await userService.createAccessRequest(req.body);
+    await auditService.log({
+      actorId: request.id,
+      action: 'access_request.created',
+      entityType: 'user',
+      entityId: request.id
+    });
     res.status(201).json({ success: true, data: request });
   } catch (error) {
     next(error);
@@ -188,6 +206,12 @@ app.get('/api/users/:id', async (req, res, next) => {
 app.put('/api/users/me', verifyJwt, async (req, res, next) => {
   try {
     const updatedUser = await userService.updateProfile(req.user.id, req.body);
+    await auditService.log({
+      actorId: req.user.id,
+      action: 'user.profile.updated',
+      entityType: 'user',
+      entityId: req.user.id
+    });
     res.json({ success: true, data: updatedUser });
   } catch (error) {
     next(error);
@@ -197,7 +221,13 @@ app.put('/api/users/me', verifyJwt, async (req, res, next) => {
 // ── Verification Requests ──
 app.post('/api/verification-requests', verifyJwt, async (req, res, next) => {
   try {
-    const request = await userService.requestVerification(req.user.id, req.body.reason);
+    const request = await userService.requestVerification(req.user.id, req.body.reason, req.body.proof_url);
+    await auditService.log({
+      actorId: req.user.id,
+      action: 'verification.requested',
+      entityType: 'verification_request',
+      entityId: request.id
+    });
     res.status(201).json({ success: true, data: request });
   } catch (error) {
     next(error);
@@ -218,6 +248,13 @@ app.get('/api/products/:id/reviews', async (req, res, next) => {
 app.post('/api/products/:id/reviews', verifyJwt, async (req, res, next) => {
   try {
     const review = await reviewService.createReview(req.params.id, req.user.id, req.body);
+    await auditService.log({
+      actorId: req.user.id,
+      action: 'review.created',
+      entityType: 'review',
+      entityId: review.id,
+      metadata: { productId: req.params.id }
+    });
     res.status(201).json({ success: true, data: review });
   } catch (error) {
     next(error);
@@ -225,7 +262,7 @@ app.post('/api/products/:id/reviews', verifyJwt, async (req, res, next) => {
 });
 
 // ── Admin: Approve User ──
-app.put('/api/admin/users/:id/approve', verifyJwt, async (req, res, next) => {
+app.put('/api/admin/users/:id/approve', verifyJwt, requireAdmin, async (req, res, next) => {
   try {
     const { data, error } = await supabase
       .from('users')
@@ -244,6 +281,13 @@ app.put('/api/admin/users/:id/approve', verifyJwt, async (req, res, next) => {
       'Your UniTrade account has been approved! You can now log in and start trading.'
     );
 
+    await auditService.log({
+      actorId: req.user.id,
+      action: 'admin.user.approved',
+      entityType: 'user',
+      entityId: data.id
+    });
+
     res.json({ success: true, data });
   } catch (error) {
     next(error);
@@ -251,7 +295,7 @@ app.put('/api/admin/users/:id/approve', verifyJwt, async (req, res, next) => {
 });
 
 // ── Admin: Verify Seller ──
-app.put('/api/admin/users/:id/verify', verifyJwt, async (req, res, next) => {
+app.put('/api/admin/users/:id/verify', verifyJwt, requireAdmin, async (req, res, next) => {
   try {
     const { data, error } = await supabase
       .from('users')
@@ -276,6 +320,13 @@ app.put('/api/admin/users/:id/verify', verifyJwt, async (req, res, next) => {
       'verification',
       'Congratulations! Your seller account has been verified. You now have a blue checkmark ✅ on your profile.'
     );
+
+    await auditService.log({
+      actorId: req.user.id,
+      action: 'admin.user.verified',
+      entityType: 'user',
+      entityId: data.id
+    });
 
     res.json({ success: true, data });
   } catch (error) {
@@ -317,6 +368,13 @@ app.post('/api/conversations', verifyJwt, async (req, res, next) => {
   try {
     const { sellerId, productId } = req.body;
     const conversation = await chatService.getOrCreateConversation(req.user.id, sellerId, productId);
+    await auditService.log({
+      actorId: req.user.id,
+      action: 'conversation.created',
+      entityType: 'conversation',
+      entityId: conversation.id,
+      metadata: { productId }
+    });
     res.status(201).json({ success: true, data: conversation });
   } catch (error) {
     next(error);
@@ -349,6 +407,13 @@ app.post('/api/conversations/:id/messages', verifyJwt, async (req, res, next) =>
     const { content, imageUrl, offerPrice } = req.body;
     const message = await chatService.sendMessage(req.params.id, req.user.id, content, imageUrl, offerPrice);
     res.status(201).json({ success: true, data: message });
+    await auditService.log({
+      actorId: req.user.id,
+      action: 'message.sent',
+      entityType: 'message',
+      entityId: message.id,
+      metadata: { conversationId: req.params.id }
+    });
 
     // Send email notification in the background (don't block response)
     (async () => {
@@ -430,6 +495,13 @@ app.put('/api/messages/:id/reject', verifyJwt, async (req, res, next) => {
 app.post('/api/orders', verifyJwt, async (req, res, next) => {
   try {
     const result = await orderService.initializePayment(req.user.id, req.body.productId, req.body.offerId);
+    await auditService.log({
+      actorId: req.user.id,
+      action: 'order.created',
+      entityType: 'order',
+      entityId: result.order?.id || null,
+      metadata: { productId: req.body.productId }
+    });
     res.status(201).json({ success: true, data: result });
   } catch (error) {
     next(error);
@@ -463,6 +535,12 @@ app.post('/api/users/:userId/reviews', verifyJwt, UserReviewController.createUse
 app.post('/api/orders/verify-payment', verifyJwt, async (req, res, next) => {
   try {
     const order = await orderService.verifyPayment(req.body.reference);
+    await auditService.log({
+      actorId: req.user.id,
+      action: 'order.payment.verified',
+      entityType: 'order',
+      entityId: order.id
+    });
 
     // Send notifications in background
     (async () => {
@@ -512,6 +590,12 @@ app.post('/api/orders/verify-payment', verifyJwt, async (req, res, next) => {
 app.put('/api/orders/:id/shipped', verifyJwt, async (req, res, next) => {
   try {
     const order = await orderService.markAsShipped(req.params.id, req.user.id);
+    await auditService.log({
+      actorId: req.user.id,
+      action: 'order.shipped',
+      entityType: 'order',
+      entityId: order.id
+    });
     res.json({ success: true, data: order });
   } catch (error) {
     next(error);
@@ -521,6 +605,12 @@ app.put('/api/orders/:id/shipped', verifyJwt, async (req, res, next) => {
 app.put('/api/orders/:id/seller-delivered', verifyJwt, async (req, res, next) => {
   try {
     const order = await orderService.markAsSellerDelivered(req.params.id, req.user.id);
+    await auditService.log({
+      actorId: req.user.id,
+      action: 'order.seller_delivered',
+      entityType: 'order',
+      entityId: order.id
+    });
     res.json({ success: true, data: order });
   } catch (error) {
     next(error);
@@ -530,6 +620,12 @@ app.put('/api/orders/:id/seller-delivered', verifyJwt, async (req, res, next) =>
 app.put('/api/orders/:id/confirm', verifyJwt, async (req, res, next) => {
   try {
     const order = await orderService.confirmDelivery(req.params.id, req.user.id);
+    await auditService.log({
+      actorId: req.user.id,
+      action: 'order.confirmed',
+      entityType: 'order',
+      entityId: order.id
+    });
     res.json({ success: true, data: order });
   } catch (error) {
     next(error);
@@ -619,6 +715,8 @@ app.post('/api/webhooks/paystack', async (req, res) => {
 });
 
 app.use('/api/products', productRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/api/bids', bidRoutes);
 app.use('/api/uploads', uploadRoutes);
 app.use(errorHandler);
 

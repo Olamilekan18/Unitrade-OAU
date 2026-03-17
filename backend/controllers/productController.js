@@ -1,7 +1,9 @@
 const supabase = require('../config/supabaseClient');
 const ProductService = require('../services/ProductService');
+const AuditService = require('../services/AuditService');
 
 const productService = new ProductService(supabase);
+const auditService = new AuditService(supabase);
 
 class ProductController {
   static async createProduct(req, res, next) {
@@ -17,6 +19,13 @@ class ProductController {
         quantity: quantity || 1,
         seller_id: req.user.id,
         status: 'available'
+      });
+
+      await auditService.log({
+        actorId: req.user.id,
+        action: 'product.created',
+        entityType: 'product',
+        entityId: product.id
       });
 
       res.status(201).json({ success: true, data: product });
