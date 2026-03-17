@@ -255,7 +255,7 @@ function ChatPage() {
     const defaultAvatar = (name) => `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=059669&color=fff&size=48`;
 
     return (
-        <div style={{ display: 'flex', height: 'calc(100vh - var(--nav-height))', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', height: 'calc(100vh - var(--nav-height))', overflow: 'hidden', padding: 'var(--space-4)' }}>
             {/* ── Conversation List (Sidebar) ── */}
             <div style={{
                 width: 360, minWidth: 300, borderRight: '1px solid var(--color-gray-200)',
@@ -388,7 +388,7 @@ function ChatPage() {
                                             </p>
                                             {activeConv.product && (
                                                 <Link to={`/product/${activeConv.product.id}`} style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-primary)' }}>
-                                                    {activeConv.product.title} — ₦{Number(activeConv.product.price).toLocaleString()}
+                                                    {activeConv.product.title} — {Number(activeConv.product.price) === 0 ? 'Free' : `₦${Number(activeConv.product.price).toLocaleString()}`}
                                                 </Link>
                                             )}
                                         </div>

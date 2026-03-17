@@ -3,7 +3,7 @@ import { Link, NavLink, useNavigate } from 'react-router-dom';
 import {
     FaBars, FaTimes, FaShoppingBag, FaSignOutAlt, FaPlus,
     FaUserCircle, FaBell, FaCheckCircle, FaShieldAlt, FaInfoCircle, FaStar,
-    FaCommentDots, FaBoxOpen, FaWallet,
+    FaCommentDots, FaBoxOpen, FaWallet, FaGavel,
 } from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext';
 import { fetchNotifications, markAllNotificationsRead, fetchConversations } from '../utils/api';
@@ -127,6 +127,14 @@ function Navbar() {
                             <NavLink to="/orders" onClick={closeMenu}>
                                 <FaBoxOpen style={{ marginRight: 4 }} /> My Orders
                             </NavLink>
+                            <NavLink to="/bids" onClick={closeMenu}>
+                                <FaGavel style={{ marginRight: 4 }} /> Bids
+                            </NavLink>
+                            {(user?.role === 'admin' || user?.role === 'super_admin') && (
+                                <NavLink to="/admin" onClick={closeMenu}>
+                                    <FaShieldAlt style={{ marginRight: 4 }} /> Admin
+                                </NavLink>
+                            )}
 
                             {/* Chat Icon */}
                             <NavLink to="/chat" onClick={closeMenu} style={{ position: 'relative' }}>
@@ -235,7 +243,7 @@ function Navbar() {
                             <NavLink to="/login" onClick={closeMenu}>
                                 Login
                             </NavLink>
-                            <Link to="/request-access" className="btn btn-primary" onClick={closeMenu} style={{ fontSize: '0.85rem' }}>
+                            <Link to="/request-access" className="btn btn-white navbar-cta" onClick={closeMenu} style={{ fontSize: '0.85rem' }}>
                                 Request Access
                             </Link>
                         </>

@@ -12,6 +12,7 @@ function ProductCard({ product }) {
     const pCount = product.product_reviews_count;
     const sRating = product.users?.seller_rating;
     const sCount = product.users?.seller_reviews_count;
+    const isFree = Number(product.price) === 0;
 
     return (
         <article className="product-card">
@@ -39,8 +40,8 @@ function ProductCard({ product }) {
                     ) : (
                         <div style={{ height: 16, marginBottom: 8 }} />
                     )}
-                    <p className="product-card-price" style={{ margin: 0 }}>
-                        ₦{Number(product.price).toLocaleString()}
+                    <p className={`product-card-price ${isFree ? 'price-free' : ''}`} style={{ margin: 0 }}>
+                        {isFree ? 'Free' : `₦${Number(product.price).toLocaleString()}`}
                     </p>
                 </div>
             </Link>
@@ -70,7 +71,7 @@ function ProductCard({ product }) {
             </div>
 
             <div style={{ padding: '0 var(--space-4) var(--space-4)', display: 'flex', gap: 8 }}>
-                {sellerId && (
+                {sellerId && !isFree && (
                     <Link
                         to={`/chat?seller=${sellerId}&product=${product.id}&action=offer`}
                         className="btn btn-outline-primary"

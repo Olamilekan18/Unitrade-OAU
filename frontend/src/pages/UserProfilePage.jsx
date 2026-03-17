@@ -136,7 +136,9 @@ function UserProfilePage() {
                                             />
                                             <div style={{ padding: 'var(--space-3)' }}>
                                                 <p style={{ fontWeight: 600, fontSize: 'var(--font-size-sm)', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title}</p>
-                                                <p style={{ fontWeight: 700, color: 'var(--color-primary)', fontSize: 'var(--font-size-sm)' }}>₦{Number(p.price).toLocaleString()}</p>
+                                                <p style={{ fontWeight: 700, color: 'var(--color-primary)', fontSize: 'var(--font-size-sm)' }}>
+                                                    {Number(p.price) === 0 ? 'Free' : `₦${Number(p.price).toLocaleString()}`}
+                                                </p>
                                             </div>
                                         </Link>
                                     ))}

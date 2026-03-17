@@ -5,7 +5,7 @@ import {
     FaArrowLeft, FaPaperPlane, FaTag, FaClock, FaUser, FaCommentDots,
     FaShoppingCart, FaLock, FaShieldAlt,
 } from 'react-icons/fa';
-import { fetchProduct, fetchReviews, createReview, createOrder, verifyPayment, checkPurchase } from '../utils/api';
+import { fetchProduct, fetchReviews, createReview, createOrder, verifyPayment, checkPurchase, fetchBidCount, createBid, fetchMyBid, updateBid } from '../utils/api';
 import { useAuth } from '../context/AuthContext';
 
 const PAYSTACK_PUBLIC_KEY = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY;
@@ -28,6 +28,14 @@ function ProductDetailPage() {
     const [comment, setComment] = useState('');
     const [submitting, setSubmitting] = useState(false);
     const [reviewMessage, setReviewMessage] = useState({ type: '', text: '' });
+    const [bidCount, setBidCount] = useState(0);
+    const [bidLoading, setBidLoading] = useState(false);
+    const [bidNote, setBidNote] = useState('');
+    const [bidMessage, setBidMessage] = useState({ type: '', text: '' });
+    const [submittingBid, setSubmittingBid] = useState(false);
+    const [hasBid, setHasBid] = useState(false);
+    const [myBid, setMyBid] = useState(null);
+    const [editingBid, setEditingBid] = useState(false);
 
     // Buy state
     const [buying, setBuying] = useState(false);
@@ -60,6 +68,39 @@ function ProductDetailPage() {
         }
         loadData();
     }, [id]);
+
+    useEffect(() => {
+        if (!product || Number(product.price) !== 0) return;
+        async function loadBidCount() {
+            try {
+                setBidLoading(true);
+                const res = await fetchBidCount(product.id);
+                setBidCount(res.data.count || 0);
+            } catch {
+                // Silently fail
+            } finally {
+                setBidLoading(false);
+            }
+        }
+        loadBidCount();
+    }, [product]);
+
+    useEffect(() => {
+        if (!product || Number(product.price) !== 0 || !isAuthenticated) return;
+        async function loadMyBid() {
+            try {
+                const res = await fetchMyBid(product.id);
+                if (res.data) {
+                    setMyBid(res.data);
+                    setHasBid(true);
+                    setBidNote(res.data.note || '');
+                }
+            } catch {
+                // Silently fail
+            }
+        }
+        loadMyBid();
+    }, [product, isAuthenticated]);
 
     // Check if user has purchased this product (for review gating)
     useEffect(() => {
@@ -164,6 +205,42 @@ function ProductDetailPage() {
         }
     }
 
+    async function handleBidSubmit(e) {
+        e.preventDefault();
+        if (!isAuthenticated || !product) return;
+        try {
+            setSubmittingBid(true);
+            setBidMessage({ type: '', text: '' });
+            const res = await createBid(product.id, bidNote.trim());
+            setBidMessage({ type: 'success', text: 'Bid submitted! The seller will review it.' });
+            setHasBid(true);
+            setMyBid(res.data);
+            setBidNote(res.data?.note || '');
+            setBidCount((prev) => prev + 1);
+        } catch (err) {
+            setBidMessage({ type: 'error', text: err.message });
+        } finally {
+            setSubmittingBid(false);
+        }
+    }
+
+    async function handleBidUpdate(e) {
+        e.preventDefault();
+        if (!myBid) return;
+        try {
+            setSubmittingBid(true);
+            setBidMessage({ type: '', text: '' });
+            const res = await updateBid(myBid.id, bidNote.trim());
+            setMyBid(res.data);
+            setEditingBid(false);
+            setBidMessage({ type: 'success', text: 'Bid updated.' });
+        } catch (err) {
+            setBidMessage({ type: 'error', text: err.message });
+        } finally {
+            setSubmittingBid(false);
+        }
+    }
+
     if (loading) {
         return (
             <div className="auth-page">
@@ -194,8 +271,12 @@ function ProductDetailPage() {
     const timeAgo = getTimeAgo(product.created_at);
     const isSeller = isAuthenticated && seller.id === user?.id;
     const isSold = product.status === 'sold' || product.quantity <= 0;
+    const isFreeItem = Number(product.price) === 0;
     const canBuy = isAuthenticated && !isSeller && !isSold && !hasPurchased && product.quantity > 0;
     const canReview = isAuthenticated && !isSeller && hasPurchased && purchaseChecked;
+    const canBid = isAuthenticated && !isSeller && !isSold && isFreeItem && product.quantity > 0;
+    const canEditBid = canBid && myBid && myBid.status === 'pending';
+    const canChatForFree = isFreeItem && myBid?.status === 'accepted';
 
     return (
         <div className="product-detail-page" style={{ minHeight: '80vh', paddingTop: 'var(--space-8)', paddingBottom: 'var(--space-10)' }}>
@@ -255,12 +336,19 @@ function ProductDetailPage() {
                             </h1>
 
                             <p style={{ fontSize: 'var(--font-size-3xl)', fontWeight: 800, color: isSold ? 'var(--color-gray-400)' : 'var(--color-primary)' }}>
-                                ₦{Number(product.price).toLocaleString()}
+                                {isFreeItem ? 'Free' : `₦${Number(product.price).toLocaleString()}`}
                             </p>
 
                             <div style={{ display: 'inline-block', fontSize: 'var(--font-size-sm)', fontWeight: 600, padding: '4px 8px', borderRadius: '4px', background: isSold ? '#fee2e2' : 'var(--color-primary-50)', color: isSold ? '#991b1b' : 'var(--color-primary-dark)', width: 'fit-content' }}>
                                 {isSold ? 'Out of Stock' : `${product.quantity} in stock`}
                             </div>
+
+                            {isFreeItem && (
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 10, fontSize: 'var(--font-size-sm)', color: 'var(--color-gray-500)' }}>
+                                    <FaUser />
+                                    {bidLoading ? 'Loading bids...' : `${bidCount} bid${bidCount === 1 ? '' : 's'} submitted`}
+                                </div>
+                            )}
 
                             {/* Rating summary */}
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
@@ -282,7 +370,7 @@ function ProductDetailPage() {
                             </div>
 
                             {/* Buy Now Button */}
-                            {canBuy && (
+                            {canBuy && !isFreeItem && (
                                 <button
                                     className="btn btn-lg buy-now-btn"
                                     onClick={handleBuyNow}
@@ -293,6 +381,91 @@ function ProductDetailPage() {
                                         ? <><FaSpinner className="spinner" /> Processing...</>
                                         : <><FaShoppingCart /> Buy Now — ₦{Number(product.price).toLocaleString()}</>}
                                 </button>
+                            )}
+
+                            {canBid && (
+                                <div style={{
+                                    display: 'flex', alignItems: 'center', gap: 8,
+                                    padding: '10px 16px', background: 'var(--color-primary-50)',
+                                    borderRadius: 'var(--radius-md)', color: 'var(--color-primary-dark)',
+                                    fontSize: 'var(--font-size-sm)', fontWeight: 600,
+                                }}>
+                                    <FaCheckCircle /> Free item — submit a bid to claim it.
+                                </div>
+                            )}
+
+                            {canBid && !hasBid && (
+                                <form onSubmit={handleBidSubmit} style={{ marginTop: 'var(--space-3)' }}>
+                                    <label style={{ fontSize: 'var(--font-size-sm)', fontWeight: 600, display: 'block', marginBottom: 6 }}>
+                                        Your bid note (only the seller can see this)
+                                    </label>
+                                    <textarea
+                                        className="input"
+                                        rows={3}
+                                        placeholder="Example: I can pick up today after class."
+                                        value={bidNote}
+                                        onChange={(e) => setBidNote(e.target.value)}
+                                        disabled={submittingBid}
+                                    />
+                                    {bidMessage.text && (
+                                        <div className={`alert ${bidMessage.type === 'success' ? 'alert-success' : 'alert-error'}`} style={{ marginTop: 'var(--space-3)' }}>
+                                            {bidMessage.text}
+                                        </div>
+                                    )}
+                                    <button type="submit" className="btn btn-primary" disabled={submittingBid} style={{ marginTop: 'var(--space-3)' }}>
+                                        {submittingBid ? <><FaSpinner className="spinner" /> Submitting...</> : 'Place Bid'}
+                                    </button>
+                                </form>
+                            )}
+
+                            {canBid && hasBid && (
+                                <div style={{ marginTop: 'var(--space-3)' }}>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 'var(--space-3)' }}>
+                                        <span className="badge badge-primary">Bid submitted</span>
+                                        {myBid?.status && (
+                                            <span className="badge badge-accent" style={{ textTransform: 'capitalize' }}>
+                                                {myBid.status}
+                                            </span>
+                                        )}
+                                    </div>
+                                    {canEditBid && (
+                                        <button className="btn btn-outline" onClick={() => setEditingBid((prev) => !prev)}>
+                                            {editingBid ? 'Cancel Edit' : 'Edit Bid'}
+                                        </button>
+                                    )}
+                                    {editingBid && canEditBid && (
+                                        <form onSubmit={handleBidUpdate} style={{ marginTop: 'var(--space-3)' }}>
+                                            <textarea
+                                                className="input"
+                                                rows={3}
+                                                value={bidNote}
+                                                onChange={(e) => setBidNote(e.target.value)}
+                                                disabled={submittingBid}
+                                            />
+                                            {bidMessage.text && (
+                                                <div className={`alert ${bidMessage.type === 'success' ? 'alert-success' : 'alert-error'}`} style={{ marginTop: 'var(--space-3)' }}>
+                                                    {bidMessage.text}
+                                                </div>
+                                            )}
+                                            <button type="submit" className="btn btn-primary" disabled={submittingBid} style={{ marginTop: 'var(--space-3)' }}>
+                                                {submittingBid ? <><FaSpinner className="spinner" /> Saving...</> : 'Save Changes'}
+                                            </button>
+                                        </form>
+                                    )}
+                                </div>
+                            )}
+
+                            {!isAuthenticated && isFreeItem && !isSold && (
+                                <div style={{
+                                    marginTop: 'var(--space-3)',
+                                    padding: '10px 16px',
+                                    background: 'var(--color-gray-50)',
+                                    borderRadius: 'var(--radius-md)',
+                                    fontSize: 'var(--font-size-sm)',
+                                    color: 'var(--color-gray-500)',
+                                }}>
+                                    <Link to="/login" style={{ color: 'var(--color-primary)', fontWeight: 600 }}>Log in</Link> to place a bid on this free item.
+                                </div>
                             )}
 
                             {hasPurchased && (
@@ -338,7 +511,7 @@ function ProductDetailPage() {
                                         Contact
                                     </a>
                                 )}
-                                {isAuthenticated && seller.id !== user?.id && (
+                                {isAuthenticated && seller.id !== user?.id && (!isFreeItem || canChatForFree) && (
                                     <Link
                                         to={`/chat?seller=${seller.id}&product=${product.id}`}
                                         className="btn btn-primary"

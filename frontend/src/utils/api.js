@@ -1,15 +1,25 @@
 const API_BASE_URL = import.meta.env.VITE_API_BASE_URL || 'http://localhost:4000/api';
 
 async function apiFetch(endpoint, options = {}) {
-  const response = await fetch(`${API_BASE_URL}${endpoint}`, {
-    credentials: 'include',
-    ...options,
-  });
+  let response;
+  try {
+    response = await fetch(`${API_BASE_URL}${endpoint}`, {
+      credentials: 'include',
+      ...options,
+    });
+  } catch (err) {
+    throw new Error('Network error. Please check your connection and try again.');
+  }
 
-  const payload = await response.json();
+  let payload = null;
+  try {
+    payload = await response.json();
+  } catch {
+    payload = null;
+  }
 
   if (!response.ok) {
-    throw new Error(payload.message || 'Request failed');
+    throw new Error(payload?.message || 'Request failed. Please try again.');
   }
 
   return payload;
@@ -55,16 +65,26 @@ export async function uploadImage(file) {
   const formData = new FormData();
   formData.append('image', file);
 
-  const response = await fetch(`${API_BASE_URL}/uploads`, {
-    method: 'POST',
-    credentials: 'include',
-    body: formData,
-  });
+  let response;
+  try {
+    response = await fetch(`${API_BASE_URL}/uploads`, {
+      method: 'POST',
+      credentials: 'include',
+      body: formData,
+    });
+  } catch {
+    throw new Error('Network error. Unable to upload right now.');
+  }
 
-  const payload = await response.json();
+  let payload = null;
+  try {
+    payload = await response.json();
+  } catch {
+    payload = null;
+  }
 
   if (!response.ok) {
-    throw new Error(payload.message || 'Image upload failed');
+    throw new Error(payload?.message || 'Image upload failed. Please try again.');
   }
 
   return payload;
@@ -122,11 +142,11 @@ export async function createUserReview(userId, data) {
 }
 
 /* ── Verification ── */
-export async function requestVerification(reason) {
+export async function requestVerification(payload) {
   return apiFetch('/verification-requests', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ reason }),
+    body: JSON.stringify(payload),
   });
 }
 
@@ -251,5 +271,122 @@ export async function requestWithdrawal(amount) {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ amount }),
+  });
+}
+
+/* â”€â”€ Admin â”€â”€ */
+export async function fetchAdminSummary() {
+  return apiFetch('/admin/summary');
+}
+
+export async function fetchAdminUsers(params = {}) {
+  const filtered = Object.entries(params).reduce((acc, [key, value]) => {
+    if (value !== undefined && value !== null && String(value).trim() !== '') {
+      acc[key] = value;
+    }
+    return acc;
+  }, {});
+  const query = new URLSearchParams(filtered).toString();
+  return apiFetch(`/admin/users${query ? `?${query}` : ''}`);
+}
+
+export async function fetchAccessRequests() {
+  return apiFetch('/admin/access-requests');
+}
+
+export async function fetchVerificationRequests() {
+  return apiFetch('/admin/verification-requests');
+}
+
+export async function adminApproveUser(userId) {
+  return apiFetch(`/admin/users/${userId}/approve`, { method: 'PUT' });
+}
+
+export async function adminVerifyUser(userId) {
+  return apiFetch(`/admin/users/${userId}/verify`, { method: 'PUT' });
+}
+
+export async function adminBlockUser(userId, is_blocked) {
+  return apiFetch(`/admin/users/${userId}/block`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ is_blocked }),
+  });
+}
+
+export async function adminSuspendUser(userId, suspended_until) {
+  return apiFetch(`/admin/users/${userId}/suspend`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ suspended_until }),
+  });
+}
+
+export async function adminSetRole(userId, role) {
+  return apiFetch(`/admin/users/${userId}/role`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ role }),
+  });
+}
+
+export async function fetchAdminProducts() {
+  return apiFetch('/admin/products');
+}
+
+export async function adminUpdateProductStatus(productId, status) {
+  return apiFetch(`/admin/products/${productId}/status`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ status }),
+  });
+}
+
+export async function fetchAdminOrders() {
+  return apiFetch('/admin/orders');
+}
+
+export async function fetchAuditLogs() {
+  return apiFetch('/admin/audit-logs');
+}
+
+export async function sendPromotion(payload) {
+  return apiFetch('/admin/promotions', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(payload),
+  });
+}
+
+/* â”€â”€ Bids â”€â”€ */
+export async function fetchBidCount(productId) {
+  return apiFetch(`/bids/product/${productId}/count`);
+}
+
+export async function fetchMyBid(productId) {
+  return apiFetch(`/bids/product/${productId}/mine`);
+}
+
+export async function createBid(productId, note) {
+  return apiFetch('/bids', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ productId, note }),
+  });
+}
+
+export async function fetchSellerBids() {
+  return apiFetch('/bids/seller');
+}
+
+export async function acceptBid(bidId) {
+  return apiFetch(`/bids/${bidId}/accept`, { method: 'PUT' });
+}
+
+export async function updateBid(bidId, note) {
+  return apiFetch(`/bids/${bidId}`, {
+    method: 'PUT',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ note }),
   });
 }

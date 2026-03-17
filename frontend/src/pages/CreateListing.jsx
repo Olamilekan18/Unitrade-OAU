@@ -13,6 +13,7 @@ function CreateListing() {
     category_id: '',
     image_url: '',
   });
+  const [isFree, setIsFree] = useState(false);
   const [categories, setCategories] = useState([]);
   const [submitting, setSubmitting] = useState(false);
   const [uploading, setUploading] = useState(false);
@@ -45,6 +46,12 @@ function CreateListing() {
   function handleChange(e) {
     const { name, value } = e.target;
     setForm((prev) => ({ ...prev, [name]: value }));
+    if (name === 'price') {
+      const numericValue = Number(value);
+      if (!Number.isNaN(numericValue) && numericValue > 0) {
+        setIsFree(false);
+      }
+    }
   }
 
   async function processFile(file) {
@@ -112,12 +119,13 @@ function CreateListing() {
       setSubmitting(true);
       await createListing({
         ...form,
-        price: Number(form.price),
+        price: isFree ? 0 : Number(form.price),
         quantity: Math.max(1, Number(form.quantity) || 1),
         category_id: Number(form.category_id),
       });
       setMessage({ type: 'success', text: 'Listing published successfully!' });
       setForm({ title: '', price: '', quantity: 1, description: '', category_id: '', image_url: '' });
+      setIsFree(false);
       setPreviewUrl('');
     } catch (error) {
       setMessage({ type: 'error', text: error.message });
@@ -183,8 +191,24 @@ function CreateListing() {
                 placeholder="e.g. 3500"
                 value={form.price}
                 onChange={handleChange}
-                required
+                required={!isFree}
+                disabled={isFree}
               />
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
+                <input
+                  id="freeItem"
+                  type="checkbox"
+                  checked={isFree}
+                  onChange={(e) => {
+                    const checked = e.target.checked;
+                    setIsFree(checked);
+                    setForm((prev) => ({ ...prev, price: checked ? '0' : '' }));
+                  }}
+                />
+                <label htmlFor="freeItem" style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-gray-600)' }}>
+                  Mark this item as free
+                </label>
+              </div>
             </div>
 
             <div className="input-group">

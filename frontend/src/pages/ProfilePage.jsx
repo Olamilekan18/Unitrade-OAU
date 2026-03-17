@@ -19,6 +19,9 @@ function ProfilePage() {
     const [verifyReason, setVerifyReason] = useState('');
     const [showVerifyForm, setShowVerifyForm] = useState(false);
     const [verifying, setVerifying] = useState(false);
+    const [verifyProofUrl, setVerifyProofUrl] = useState('');
+    const [uploadingProof, setUploadingProof] = useState(false);
+    const [verifyProofPreview, setVerifyProofPreview] = useState('');
     const [localAvatarUrl, setLocalAvatarUrl] = useState(null);
     const fileInputRef = useRef(null);
 
@@ -90,17 +93,44 @@ function ProfilePage() {
     async function handleVerifyRequest(e) {
         e.preventDefault();
         if (!verifyReason.trim()) return;
+        if (uploadingProof) {
+            setMessage({ type: 'error', text: 'Please wait for the proof image to finish uploading.' });
+            return;
+        }
 
         try {
             setVerifying(true);
-            await requestVerification(verifyReason.trim());
+            await requestVerification({ reason: verifyReason.trim(), proof_url: verifyProofUrl });
             setShowVerifyForm(false);
             setVerifyReason('');
+            setVerifyProofUrl('');
+            setVerifyProofPreview('');
             setMessage({ type: 'success', text: 'Verification request submitted! You\'ll be notified once reviewed.' });
         } catch (err) {
             setMessage({ type: 'error', text: err.message });
         } finally {
             setVerifying(false);
+        }
+    }
+
+    async function handleProofUpload(e) {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        const preview = URL.createObjectURL(file);
+        setVerifyProofPreview(preview);
+        setVerifyProofUrl('');
+
+        try {
+            setUploadingProof(true);
+            const payload = await uploadImage(file);
+            setVerifyProofUrl(payload.data.url);
+        } catch (err) {
+            setMessage({ type: 'error', text: err.message });
+            setVerifyProofPreview('');
+            setVerifyProofUrl('');
+        } finally {
+            setUploadingProof(false);
         }
     }
 
@@ -225,9 +255,30 @@ function ProfilePage() {
                                         required
                                         style={{ marginBottom: 'var(--space-3)' }}
                                     />
+                                    <label style={{ display: 'block', marginBottom: 'var(--space-2)', fontWeight: 600, fontSize: 'var(--font-size-sm)' }}>
+                                        Upload ID card or portal screenshot (optional)
+                                    </label>
+                                    <input type="file" accept="image/*" onChange={handleProofUpload} disabled={uploadingProof} />
+                                    {uploadingProof && (
+                                        <p style={{ color: 'var(--color-primary)', fontSize: 'var(--font-size-sm)', marginTop: 8, display: 'flex', alignItems: 'center', gap: 6 }}>
+                                            <FaSpinner className="spinner" /> Uploading proof...
+                                        </p>
+                                    )}
+                                    {!uploadingProof && verifyProofUrl && (
+                                        <p style={{ color: 'var(--color-success, #059669)', fontSize: 'var(--font-size-sm)', marginTop: 8 }}>
+                                            ✅ Proof uploaded
+                                        </p>
+                                    )}
+                                    {verifyProofPreview && (
+                                        <img
+                                            src={verifyProofPreview}
+                                            alt="Verification proof"
+                                            style={{ width: '100%', maxHeight: 220, objectFit: 'cover', borderRadius: 12, marginTop: 12, border: '1px solid var(--color-gray-200)' }}
+                                        />
+                                    )}
                                     <div style={{ display: 'flex', gap: 'var(--space-3)' }}>
-                                        <button type="submit" className="btn btn-primary" disabled={verifying} style={{ fontSize: '0.85rem' }}>
-                                            {verifying ? <><FaSpinner className="spinner" /> Submitting...</> : <><FaShieldAlt /> Submit Request</>}
+                                        <button type="submit" className="btn btn-primary" disabled={verifying || uploadingProof} style={{ fontSize: '0.85rem' }}>
+                                            {verifying ? <><FaSpinner className="spinner" /> Submitting...</> : uploadingProof ? <><FaSpinner className="spinner" /> Uploading proof...</> : <><FaShieldAlt /> Submit Request</>}
                                         </button>
                                         <button type="button" className="btn btn-outline" onClick={() => setShowVerifyForm(false)} style={{ fontSize: '0.85rem' }}>
                                             Cancel
