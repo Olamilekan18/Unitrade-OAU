@@ -13,6 +13,9 @@ create table if not exists public.users (
   address text default '',
   avatar_url text default '',
   is_verified boolean not null default false,
+  role text not null default 'user' check (role in ('user', 'admin', 'super_admin')),
+  is_blocked boolean not null default false,
+  suspended_until timestamptz,
   access_status text not null default 'pending' check (access_status in ('pending', 'approved')),
   created_at timestamptz not null default now()
 );
@@ -48,6 +51,7 @@ create table if not exists public.verification_requests (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references public.users(id) on update cascade on delete cascade,
   reason text not null,
+  proof_url text default '',
   status text not null default 'pending' check (status in ('pending', 'approved', 'rejected')),
   created_at timestamptz not null default now()
 );
@@ -76,8 +80,49 @@ create table if not exists public.messages (
   conversation_id uuid not null references public.conversations(id) on update cascade on delete cascade,
   sender_id uuid not null references public.users(id) on update cascade on delete cascade,
   content text not null,
+  image_url text,
+  offer_price numeric(12,2) check (offer_price >= 0),
+  offer_status text check (offer_status in ('pending', 'accepted', 'rejected')),
   is_read boolean not null default false,
   created_at timestamptz not null default now()
+);
+
+create table if not exists public.bids (
+  id uuid primary key default gen_random_uuid(),
+  product_id uuid not null references public.products(id) on update cascade on delete cascade,
+  bidder_id uuid not null references public.users(id) on update cascade on delete cascade,
+  note text default '',
+  status text not null default 'pending' check (status in ('pending', 'accepted', 'rejected')),
+  created_at timestamptz not null default now(),
+  unique(product_id, bidder_id)
+);
+
+create table if not exists public.audit_logs (
+  id uuid primary key default gen_random_uuid(),
+  actor_id uuid references public.users(id) on update cascade on delete set null,
+  action text not null,
+  entity_type text,
+  entity_id text,
+  metadata jsonb default '{}'::jsonb,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.promotions (
+  id uuid primary key default gen_random_uuid(),
+  title text not null,
+  message text not null,
+  audience text not null,
+  send_email boolean not null default false,
+  created_by uuid references public.users(id) on update cascade on delete set null,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.promotion_recipients (
+  id uuid primary key default gen_random_uuid(),
+  promotion_id uuid not null references public.promotions(id) on update cascade on delete cascade,
+  user_id uuid not null references public.users(id) on update cascade on delete cascade,
+  status text not null default 'pending' check (status in ('pending', 'sent', 'failed')),
+  sent_at timestamptz
 );
 
 create index if not exists idx_products_category_id on public.products(category_id);
@@ -89,9 +134,49 @@ create index if not exists idx_conversations_buyer on public.conversations(buyer
 create index if not exists idx_conversations_seller on public.conversations(seller_id);
 create index if not exists idx_messages_conversation on public.messages(conversation_id, created_at);
 create index if not exists idx_messages_sender on public.messages(sender_id);
+create index if not exists idx_bids_product on public.bids(product_id, created_at);
+create index if not exists idx_bids_bidder on public.bids(bidder_id);
+create index if not exists idx_audit_logs_actor on public.audit_logs(actor_id);
+create index if not exists idx_audit_logs_created_at on public.audit_logs(created_at desc);
+create index if not exists idx_promotions_created_at on public.promotions(created_at desc);
+create index if not exists idx_promo_recipients_status on public.promotion_recipients(status);
+create index if not exists idx_promo_recipients_promo on public.promotion_recipients(promotion_id);
+
+-- ── Orders ──
+create table if not exists public.orders (
+  id uuid primary key default gen_random_uuid(),
+  buyer_id uuid not null references public.users(id) on update cascade on delete cascade,
+  seller_id uuid not null references public.users(id) on update cascade on delete cascade,
+  product_id uuid not null references public.products(id) on update cascade on delete cascade,
+  amount numeric(12,2) not null check (amount >= 0),
+  status text not null default 'pending'
+    check (status in ('pending','paid','delivered','cancelled')),
+  paystack_reference text unique,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
+);
+
+create index if not exists idx_orders_buyer on public.orders(buyer_id);
+create index if not exists idx_orders_seller on public.orders(seller_id);
+create index if not exists idx_orders_product on public.orders(product_id);
+create index if not exists idx_orders_status on public.orders(status);
 
 insert into public.categories (name)
-values ('Textbooks'), ('Hostel Gear'), ('Electronics'), ('Fashion')
+values
+  ('Textbooks'),
+  ('Hostel Gear'),
+  ('Electronics'),
+  ('Fashion'),
+  ('Phones & Accessories'),
+  ('Appliances'),
+  ('Furniture'),
+  ('Stationery'),
+  ('Sports & Fitness'),
+  ('Beauty & Care'),
+  ('Gaming'),
+  ('Musical Instruments'),
+  ('Tickets & Events'),
+  ('Services & Gigs')
 on conflict (name) do nothing;
 
 alter table public.users enable row level security;
@@ -101,6 +186,11 @@ alter table public.reviews enable row level security;
 alter table public.verification_requests enable row level security;
 alter table public.conversations enable row level security;
 alter table public.messages enable row level security;
+alter table public.orders enable row level security;
+alter table public.bids enable row level security;
+alter table public.audit_logs enable row level security;
+alter table public.promotions enable row level security;
+alter table public.promotion_recipients enable row level security;
 
 -- Public read access for categories and available products.
 drop policy if exists "Public can read categories" on public.categories;
@@ -134,3 +224,77 @@ create policy "Authenticated can insert reviews"
   on public.reviews for insert
   with check (true);
 
+drop policy if exists "Authenticated can insert orders" on public.orders;
+create policy "Authenticated can insert orders"
+  on public.orders for insert
+  with check (true);
+
+drop policy if exists "Users can read own orders" on public.orders;
+create policy "Users can read own orders"
+  on public.orders for select
+  using (true);
+
+-- Bids: bidders can create bids, sellers can view bids on their products.
+drop policy if exists "Bidder can insert bids" on public.bids;
+create policy "Bidder can insert bids"
+  on public.bids for insert
+  with check (bidder_id = auth.uid());
+
+drop policy if exists "Seller can read bids" on public.bids;
+create policy "Seller can read bids"
+  on public.bids for select
+  using (
+    exists (
+      select 1 from public.products
+      where public.products.id = public.bids.product_id
+        and public.products.seller_id = auth.uid()
+    )
+  );
+
+drop policy if exists "Bidder can read own bids" on public.bids;
+create policy "Bidder can read own bids"
+  on public.bids for select
+  using (bidder_id = auth.uid());
+
+drop policy if exists "Bidder can update own bids" on public.bids;
+create policy "Bidder can update own bids"
+  on public.bids for update
+  using (bidder_id = auth.uid())
+  with check (bidder_id = auth.uid());
+
+-- ── User Reviews ──
+create table if not exists public.user_reviews (
+  id uuid primary key default gen_random_uuid(),
+  seller_id uuid not null references public.users(id) on update cascade on delete cascade,
+  reviewer_id uuid not null references public.users(id) on update cascade on delete cascade,
+  rating integer not null check (rating >= 1 and rating <= 5),
+  comment text default '',
+  created_at timestamptz not null default now(),
+  unique(seller_id, reviewer_id)
+);
+
+create index if not exists idx_user_reviews_seller on public.user_reviews(seller_id);
+
+alter table public.user_reviews enable row level security;
+create policy "Public can read user reviews" on public.user_reviews for select using (true);
+create policy "Authenticated can insert user reviews" on public.user_reviews for insert with check (true);
+
+-- Audit logs: only admins read (handled by backend). No direct access for clients.
+drop policy if exists "No client access to audit logs" on public.audit_logs;
+create policy "No client access to audit logs"
+  on public.audit_logs for select
+  using (false);
+
+drop policy if exists "No client access to promotions" on public.promotions;
+create policy "No client access to promotions"
+  on public.promotions for select
+  using (false);
+
+drop policy if exists "No client access to promotion recipients" on public.promotion_recipients;
+create policy "No client access to promotion recipients"
+  on public.promotion_recipients for select
+  using (false);
+
+update public.users
+set role = 'super_admin'
+where oau_email = 'olamilekankareem@student.oauife.edu.ng';
