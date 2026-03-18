@@ -18,6 +18,7 @@ import {
   fetchVerificationRequests,
   adminApproveUser,
   adminVerifyUser,
+  adminUnverifyUser,
   adminBlockUser,
   adminSuspendUser,
   adminSetRole,
@@ -83,6 +84,32 @@ function AdminDashboard() {
     if (!isAuthenticated || !isAdmin) return;
     loadOverview();
   }, [isAuthenticated, isAdmin]);
+
+  function isUserSuspended(userRow) {
+    if (!userRow?.suspended_until) return false;
+    const until = new Date(userRow.suspended_until);
+    if (Number.isNaN(until.getTime())) return false;
+    return until > new Date();
+  }
+
+  function getUserStatus(userRow) {
+    if (userRow.is_blocked) {
+      return { label: 'blocked', tone: 'danger' };
+    }
+    if (isUserSuspended(userRow)) {
+      return { label: 'suspended', tone: 'warning' };
+    }
+    if (userRow.access_status && userRow.access_status !== 'approved') {
+      return {
+        label: userRow.access_status,
+        tone: userRow.access_status === 'pending' ? 'warning' : 'danger',
+      };
+    }
+    if (userRow.is_verified) {
+      return { label: 'verified', tone: 'success' };
+    }
+    return { label: 'approved', tone: 'success' };
+  }
 
   async function loadOverview() {
     try {
@@ -243,18 +270,23 @@ function AdminDashboard() {
   }, [summary, signupRange]);
 
   const chartPoints = useMemo(() => {
-    if (!chartSeries.length) return { points: '', labels: [], max: 1 };
+    if (!chartSeries.length) return { points: '', labels: [], max: 1, coords: [] };
     const max = Math.max(...chartSeries.map((d) => d.count), 1);
     const width = 600;
     const height = 180;
     const pad = 16;
     const stepX = chartSeries.length > 1 ? (width - pad * 2) / (chartSeries.length - 1) : 0;
-    const points = chartSeries.map((d, i) => {
+    const coords = chartSeries.map((d, i) => {
       const x = pad + stepX * i;
       const y = height - pad - (d.count / max) * (height - pad * 2);
-      return `${x},${y}`;
+      return { x, y, count: d.count };
     });
-    return { points: points.join(' '), labels: chartSeries.map((d) => d.label), max };
+    return {
+      points: coords.map((c) => `${c.x},${c.y}`).join(' '),
+      labels: chartSeries.map((d) => d.label),
+      max,
+      coords,
+    };
   }, [chartSeries]);
 
   if (loading) return null;
@@ -305,6 +337,19 @@ function AdminDashboard() {
     setActioning((prev) => ({ ...prev, [id]: true }));
     try {
       await adminVerifyUser(id);
+      if (activeTab === 'users') await loadUsers();
+      if (activeTab === 'verification') await loadVerificationRequests();
+    } catch (err) {
+      setStatus({ loading: false, error: err.message });
+    } finally {
+      setActioning((prev) => ({ ...prev, [id]: false }));
+    }
+  }
+
+  async function handleUnverify(id) {
+    setActioning((prev) => ({ ...prev, [id]: true }));
+    try {
+      await adminUnverifyUser(id);
       if (activeTab === 'users') await loadUsers();
       if (activeTab === 'verification') await loadVerificationRequests();
     } catch (err) {
@@ -388,6 +433,10 @@ function AdminDashboard() {
 
     if (action === 'verify') {
       await handleVerify(id);
+      return;
+    }
+    if (action === 'unverify') {
+      await handleUnverify(id);
       return;
     }
     if (action === 'block') {
@@ -556,6 +605,20 @@ function AdminDashboard() {
                           strokeWidth="3"
                           points={chartPoints.points}
                         />
+                        {chartPoints.coords.map((pt, idx) => (
+                          <g key={`pt-${idx}`}>
+                            <circle cx={pt.x} cy={pt.y} r="4" fill="var(--color-primary)" />
+                            <text
+                              x={pt.x}
+                              y={Math.max(pt.y - 8, 10)}
+                              textAnchor="middle"
+                              fontSize="10"
+                              fill="var(--color-gray-700)"
+                            >
+                              {pt.count}
+                            </text>
+                          </g>
+                        ))}
                         <defs>
                           <linearGradient id="adminLine" x1="0" y1="0" x2="1" y2="0">
                             <stop offset="0%" stopColor="var(--color-primary)" />
@@ -601,11 +664,14 @@ function AdminDashboard() {
                         <p>{u.oau_email}</p>
                       </div>
                       <div className="admin-cell" data-label="Status">
-                        <span className={`admin-pill ${u.access_status === 'approved' ? 'success' : 'warning'}`}>
-                          {u.access_status}
-                        </span>
-                        {u.is_blocked && <span className="admin-pill danger">Blocked</span>}
-                        {u.suspended_until && <span className="admin-pill warning">Suspended</span>}
+                        {(() => {
+                          const statusInfo = getUserStatus(u);
+                          return (
+                            <span className={`admin-pill ${statusInfo.tone}`}>
+                              {statusInfo.label}
+                            </span>
+                          );
+                        })()}
                       </div>
                       <div className="admin-cell" data-label="Role">
                         {isSuperAdmin ? (
@@ -630,10 +696,15 @@ function AdminDashboard() {
                           onChange={(e) => setUserAction((prev) => ({ ...prev, [u.id]: e.target.value }))}
                         >
                           <option value="">Select action</option>
-                          <option value="verify">Verify seller</option>
+                          {!u.is_verified && u.access_status === 'approved' && (
+                            <option value="verify">Verify seller</option>
+                          )}
+                          {u.is_verified && (
+                            <option value="unverify">Remove verification</option>
+                          )}
                           <option value={u.is_blocked ? 'unblock' : 'block'}>{u.is_blocked ? 'Unblock user' : 'Block user'}</option>
                           <option value="suspend">Suspend user</option>
-                          {u.suspended_until && <option value="clear_suspension">Clear suspension</option>}
+                          {isUserSuspended(u) && <option value="clear_suspension">Clear suspension</option>}
                         </select>
                         {userAction[u.id] === 'suspend' && (
                           <select

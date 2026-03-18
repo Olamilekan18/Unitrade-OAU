@@ -37,6 +37,14 @@ function Footer() {
                         <Link to="/marketplace">Electronics</Link>
                         <Link to="/marketplace">Fashion</Link>
                     </div>
+
+                    <div className="footer-column">
+                        <h4>Customer Care</h4>
+                        <a href="https://wa.me/2349035095897" target="_blank" rel="noreferrer">
+                            WhatsApp: 09035095897
+                        </a>
+                        <a href="mailto:olamilekankareem717@gmail.com">olamilekankareem717@gmail.com</a>
+                    </div>
                 </div>
 
                 <div className="footer-bottom">

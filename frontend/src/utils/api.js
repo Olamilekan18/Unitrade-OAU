@@ -377,6 +377,10 @@ export async function adminVerifyUser(userId) {
   return apiFetch(`/admin/users/${userId}/verify`, { method: 'PUT' });
 }
 
+export async function adminUnverifyUser(userId) {
+  return apiFetch(`/admin/users/${userId}/unverify`, { method: 'PUT' });
+}
+
 export async function adminBlockUser(userId, is_blocked) {
   return apiFetch(`/admin/users/${userId}/block`, {
     method: 'PUT',

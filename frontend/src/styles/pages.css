@@ -272,6 +272,15 @@
     gap: var(--space-4);
 }
 
+.landing-request-btn {
+    box-shadow: 0 14px 26px rgba(0, 0, 0, 0.18);
+    border: 2px solid rgba(255, 255, 255, 0.85);
+}
+
+.landing-request-btn:hover {
+    transform: translateY(-1px);
+}
+
 .landing-hero-points {
     display: grid;
     gap: var(--space-3);
@@ -1453,7 +1462,7 @@
 
 .footer-grid {
     display: grid;
-    grid-template-columns: 2fr 1fr 1fr;
+    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
     gap: var(--space-10);
     margin-bottom: var(--space-10);
 }
@@ -1500,6 +1509,8 @@
     font-size: var(--font-size-sm);
     padding: var(--space-1) 0;
     transition: color var(--transition-fast);
+    word-break: break-word;
+    overflow-wrap: anywhere;
 }
 
 .footer-column a:hover {

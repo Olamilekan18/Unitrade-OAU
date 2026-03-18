@@ -34,7 +34,7 @@ function LandingPage() {
                             <Link to="/marketplace" className="btn btn-lg btn-white">
                                 Explore Listings <FaArrowRight />
                             </Link>
-                            <Link to="/request-access" className="btn btn-lg btn-ghost">
+                            <Link to="/request-access" className="btn btn-lg btn-white landing-request-btn">
                                 Request Access
                             </Link>
                         </div>
