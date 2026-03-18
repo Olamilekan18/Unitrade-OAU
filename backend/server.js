@@ -23,8 +23,13 @@ const UserReviewController = require('./controllers/userReviewController');
 const cron = require('node-cron');
 const { errorHandler } = require('./middlewares/errorMiddleware');
 const { verifyJwt, requireAdmin } = require('./middlewares/authMiddleware');
+const { registerValidation, loginValidation, reviewValidation } = require('./middlewares/validateMiddleware');
 
+const helmet = require('helmet');
+const rateLimit = require('express-rate-limit');
 const app = express();
+app.use(helmet());
+app.set('trust proxy', 1);
 const userService = new UserService(supabase);
 const categoryService = new CategoryService(supabase);
 const reviewService = new ReviewService(supabase);
@@ -69,6 +74,20 @@ app.use(
 );
 app.use(express.json());
 app.use(cookieParser());
+
+const globalLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 300,
+  message: { success: false, message: 'Too many requests from this IP, please try again after 15 minutes.' }
+});
+
+const authLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  max: 20,
+  message: { success: false, message: 'Too many authentication attempts from this IP, please try again after 15 minutes.' }
+});
+
+app.use('/api', globalLimiter);
 
 app.get('/api/health', (_req, res) => res.json({ success: true, message: 'UniTrade API healthy' }));
 
@@ -116,7 +135,7 @@ app.post('/api/webhooks/user-approved', async (req, res) => {
 });
 
 // ── Access Requests (Register with password) ──
-app.post('/api/access-requests', async (req, res, next) => {
+app.post('/api/access-requests', authLimiter, registerValidation, async (req, res, next) => {
   try {
     const request = await userService.createAccessRequest(req.body);
     await auditService.log({
@@ -132,7 +151,7 @@ app.post('/api/access-requests', async (req, res, next) => {
 });
 
 // ── Sessions (Login with email + password) ──
-app.post('/api/sessions', async (req, res, next) => {
+app.post('/api/sessions', authLimiter, loginValidation, async (req, res, next) => {
   try {
     const { email, password } = req.body;
     const user = await userService.authenticateUser(email, password);
@@ -140,7 +159,7 @@ app.post('/api/sessions', async (req, res, next) => {
     const token = jwt.sign(
       { sub: user.id, email: user.oau_email },
       process.env.JWT_SECRET,
-      { expiresIn: '1d' }
+      { expiresIn: '1d', jwtid: require('crypto').randomUUID() }
     );
 
     const isProd = process.env.NODE_ENV === 'production';
@@ -165,6 +184,10 @@ app.get('/api/sessions/me', async (req, res, next) => {
     }
 
     const payload = jwt.verify(token, process.env.JWT_SECRET);
+    if (payload.jti) {
+      const { data: isBlacklisted } = await supabase.from('blacklisted_tokens').select('id').eq('jti', payload.jti).maybeSingle();
+      if (isBlacklisted) return res.status(401).json({ success: false, message: 'Session expired' });
+    }
     const user = await userService.getApprovedUserById(payload.sub);
     res.json({ success: true, data: { user } });
   } catch (error) {
@@ -173,7 +196,16 @@ app.get('/api/sessions/me', async (req, res, next) => {
   }
 });
 
-app.delete('/api/sessions', (_req, res) => {
+app.delete('/api/sessions', async (req, res) => {
+  const token = req.cookies?.access_token;
+  if (token) {
+    try {
+      const decoded = jwt.decode(token);
+      if (decoded && decoded.jti) {
+        await supabase.from('blacklisted_tokens').insert({ jti: decoded.jti, expires_at: new Date(decoded.exp * 1000).toISOString() });
+      }
+    } catch (e) {}
+  }
   const isProd = process.env.NODE_ENV === 'production';
   res.clearCookie('access_token', {
     httpOnly: true,
@@ -245,7 +277,7 @@ app.get('/api/products/:id/reviews', async (req, res, next) => {
   }
 });
 
-app.post('/api/products/:id/reviews', verifyJwt, async (req, res, next) => {
+app.post('/api/products/:id/reviews', verifyJwt, reviewValidation, async (req, res, next) => {
   try {
     const review = await reviewService.createReview(req.params.id, req.user.id, req.body);
     await auditService.log({
@@ -324,6 +356,37 @@ app.put('/api/admin/users/:id/verify', verifyJwt, requireAdmin, async (req, res,
     await auditService.log({
       actorId: req.user.id,
       action: 'admin.user.verified',
+      entityType: 'user',
+      entityId: data.id
+    });
+
+    res.json({ success: true, data });
+  } catch (error) {
+    next(error);
+  }
+});
+
+// ── Admin: Unverify Seller ──
+app.put('/api/admin/users/:id/unverify', verifyJwt, requireAdmin, async (req, res, next) => {
+  try {
+    const { data, error } = await supabase
+      .from('users')
+      .update({ is_verified: false })
+      .eq('id', req.params.id)
+      .select('id, name, oau_email, store_name')
+      .single();
+
+    if (error) throw error;
+
+    await notificationService.create(
+      data.id,
+      'verification',
+      'Your seller verification has been removed by an admin.'
+    );
+
+    await auditService.log({
+      actorId: req.user.id,
+      action: 'admin.user.unverified',
       entityType: 'user',
       entityId: data.id
     });

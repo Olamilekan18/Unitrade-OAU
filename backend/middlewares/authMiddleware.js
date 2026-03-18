@@ -10,6 +10,10 @@ async function verifyJwt(req, res, next) {
 
   try {
     const payload = jwt.verify(token, process.env.JWT_SECRET);
+    if (payload.jti) {
+      const { data: isBlacklisted } = await supabase.from('blacklisted_tokens').select('id').eq('jti', payload.jti).maybeSingle();
+      if (isBlacklisted) throw new Error('Blacklisted');
+    }
     req.user = { id: payload.sub, email: payload.email };
 
     const { data, error } = await supabase

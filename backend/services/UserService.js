@@ -29,28 +29,18 @@ class UserService {
   async authenticateUser(email, password) {
     const { data, error } = await this.supabase
       .from('users')
-      .select('id, name, oau_email, department, access_status, password_hash, bio, phone, address, avatar_url, store_name, is_verified, role, is_blocked, suspended_until')
+      .select('id, name, oau_email, department, access_status, password_hash, bio, phone, address, avatar_url, store_name, is_verified, role, is_blocked, suspended_until, auth_failures')
       .eq('oau_email', email)
       .maybeSingle();
+
+    if (error) throw error;
+
 
     if (error) throw error;
 
     if (!data) {
       const err = new Error('No account found with that email.');
       err.status = 404;
-      throw err;
-    }
-
-    const valid = await bcrypt.compare(password, data.password_hash);
-    if (!valid) {
-      const err = new Error('Incorrect password.');
-      err.status = 401;
-      throw err;
-    }
-
-    if (data.access_status !== 'approved') {
-      const err = new Error('Your access request is still pending approval.');
-      err.status = 403;
       throw err;
     }
 
@@ -61,9 +51,33 @@ class UserService {
     }
 
     if (data.suspended_until && new Date(data.suspended_until) > new Date()) {
-      const err = new Error('Your account is currently suspended.');
+      const err = new Error('Your account is currently suspended due to too many failed login attempts. Please try again later.');
       err.status = 403;
       throw err;
+    }
+
+    if (data.access_status !== 'approved') {
+      const err = new Error('Your access request is still pending approval.');
+      err.status = 403;
+      throw err;
+    }
+
+    const valid = await bcrypt.compare(password, data.password_hash);
+    if (!valid) {
+      const failures = (data.auth_failures || 0) + 1;
+      const updates = { auth_failures: failures };
+      if (failures >= 5) {
+        updates.suspended_until = new Date(Date.now() + 30 * 60 * 1000).toISOString();
+      }
+      await this.supabase.from('users').update(updates).eq('id', data.id);
+
+      const err = new Error(failures >= 5 ? 'Account suspended for 30 minutes due to multiple failed login attempts.' : 'Incorrect password.');
+      err.status = 401;
+      throw err;
+    }
+
+    if (data.auth_failures > 0) {
+      await this.supabase.from('users').update({ auth_failures: 0, suspended_until: null }).eq('id', data.id);
     }
 
     // Don't send password_hash to the client
