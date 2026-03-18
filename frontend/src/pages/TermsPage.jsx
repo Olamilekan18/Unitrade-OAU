@@ -46,7 +46,7 @@ function TermsPage() {
                             are handled based on the specific transaction and platform policies.
                         </p>
                         <p>
-                            Disputes must be reported within 72 hours of meetup/delivery. Customer care responds within
+                            Disputes must be reported within 24 hours of meetup/delivery. Customer care responds within
                             24 hours, and resolutions are handled within 7 business days where possible.
                         </p>
                         <p>

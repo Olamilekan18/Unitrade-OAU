@@ -199,7 +199,7 @@ function WalletPage() {
                                     </div>
                                     <div>
                                         <label className="label">Account Name {resolvingName && <FaSpinner className="spinner" style={{ marginLeft: 8, fontSize: '0.8rem' }} />}</label>
-                                        <input className="input" required readOnly value={bankForm.accountName} placeholder={resolvingName ? "Resolving name..." : "Auto-filled account name"} style={{ backgroundColor: 'var(--color-gray-50)', color: 'var(--color-gray-700)' }} />
+                                        <input className="input" required readOnly value={bankForm.accountName} placeholder={resolvingName ? "Getting the name on the account..." : "Auto-filled account name"} style={{ backgroundColor: 'var(--color-gray-50)', color: 'var(--color-gray-700)' }} />
                                     </div>
                                     <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 8, marginTop: 'var(--space-2)' }}>
                                         {walletData.bankDetails?.bankName && (
