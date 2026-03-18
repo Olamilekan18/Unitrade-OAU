@@ -115,6 +115,18 @@ class AdminService {
     return data;
   }
 
+  async deleteProduct(productId) {
+    const { data, error } = await this.supabase
+      .from('products')
+      .delete()
+      .eq('id', productId)
+      .select('id, title')
+      .single();
+
+    if (error) throw error;
+    return data;
+  }
+
   async listOrders() {
     const { data, error } = await this.supabase
       .from('orders')
@@ -136,6 +148,136 @@ class AdminService {
       .select('id, action, entity_type, entity_id, metadata, created_at, actor:actor_id(id, name, oau_email)')
       .order('created_at', { ascending: false })
       .limit(limit);
+
+    if (error) throw error;
+    return data || [];
+  }
+
+  async listMessages({ search } = {}) {
+    let query = this.supabase
+      .from('messages')
+      .select(`
+        id, content, image_url, offer_price, offer_status, created_at,
+        sender:sender_id(id, name, oau_email),
+        conversation:conversation_id(
+          id,
+          buyer:buyer_id(id, name, oau_email),
+          seller:seller_id(id, name, oau_email),
+          product:product_id(id, title)
+        )
+      `)
+      .order('created_at', { ascending: false })
+      .limit(200);
+
+    if (search) {
+      query = query.ilike('content', `%${search}%`);
+    }
+
+    const { data, error } = await query;
+    if (error) throw error;
+    return data || [];
+  }
+
+  async listConversations() {
+    const { data, error } = await this.supabase
+      .from('conversations')
+      .select(`
+        id, buyer_id, seller_id, product_id, updated_at, created_at,
+        buyer:buyer_id(id, name, oau_email),
+        seller:seller_id(id, name, oau_email),
+        product:product_id(id, title, price)
+      `)
+      .order('updated_at', { ascending: false });
+
+    if (error) throw error;
+
+    const enriched = await Promise.all(
+      (data || []).map(async (conv) => {
+        const { data: lastMsg } = await this.supabase
+          .from('messages')
+          .select('content, sender_id, image_url, created_at')
+          .eq('conversation_id', conv.id)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        return {
+          ...conv,
+          lastMessage: lastMsg || null
+        };
+      })
+    );
+
+    return enriched;
+  }
+
+  async listConversationMessages(conversationId) {
+    const { data, error } = await this.supabase
+      .from('messages')
+      .select(`
+        id, conversation_id, sender_id, content, image_url, offer_price, offer_status, is_read, created_at,
+        sender:sender_id(id, name, oau_email)
+      `)
+      .eq('conversation_id', conversationId)
+      .order('created_at', { ascending: true });
+
+    if (error) throw error;
+    return data || [];
+  }
+
+  async listMessageReports() {
+    const { data, error } = await this.supabase
+      .from('message_reports')
+      .select(`
+        id, reason, status, created_at,
+        reporter:reporter_id(id, name, oau_email),
+        reported_user:reported_user_id(id, name, oau_email),
+        message:message_id(id, content, created_at),
+        conversation:conversation_id(
+          id,
+          buyer:buyer_id(id, name, oau_email),
+          seller:seller_id(id, name, oau_email),
+          product:product_id(id, title)
+        )
+      `)
+      .order('created_at', { ascending: false })
+      .limit(200);
+
+    if (error) throw error;
+    return data || [];
+  }
+
+  async listConversationReports() {
+    const { data, error } = await this.supabase
+      .from('conversation_reports')
+      .select(`
+        id, reason, status, created_at,
+        reporter:reporter_id(id, name, oau_email),
+        reported_user:reported_user_id(id, name, oau_email),
+        conversation:conversation_id(
+          id,
+          buyer:buyer_id(id, name, oau_email),
+          seller:seller_id(id, name, oau_email),
+          product:product_id(id, title)
+        )
+      `)
+      .order('created_at', { ascending: false })
+      .limit(200);
+
+    if (error) throw error;
+    return data || [];
+  }
+
+  async listAccountReports() {
+    const { data, error } = await this.supabase
+      .from('account_reports')
+      .select(`
+        id, reason, status, created_at,
+        reporter:reporter_id(id, name, oau_email),
+        reported_user:reported_user_id(id, name, oau_email)
+      `)
+      .order('created_at', { ascending: false })
+      .limit(200);
 
     if (error) throw error;
     return data || [];

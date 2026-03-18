@@ -36,7 +36,11 @@ class ProductController {
 
   static async getProducts(req, res, next) {
     try {
-      const products = await productService.getAvailableProducts();
+      const { q, category } = req.query;
+      const products = await productService.getAvailableProducts({
+        search: q,
+        categoryId: category
+      });
       res.json({ success: true, data: products });
     } catch (error) {
       next(error);

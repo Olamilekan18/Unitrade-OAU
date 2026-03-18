@@ -8,6 +8,16 @@ class PromoService {
     this.senderName = process.env.BREVO_SENDER_NAME || 'UniTrade OAU';
   }
 
+  getEmailConfigStatus() {
+    if (!this.brevoApiKey) {
+      return { ok: false, reason: 'Missing BREVO_API_KEY' };
+    }
+    if (!this.senderEmail) {
+      return { ok: false, reason: 'Missing BREVO_SENDER_EMAIL' };
+    }
+    return { ok: true };
+  }
+
   async createPromotion({ title, message, audience, sendEmail, actorId }) {
     const { data, error } = await this.supabase
       .from('promotions')
@@ -42,8 +52,9 @@ class PromoService {
   }
 
   async sendPendingBatch(limit = DEFAULT_DAILY_LIMIT, promotionId = null) {
-    if (!this.brevoApiKey || !this.senderEmail) {
-      return { attempted: 0, sent: 0, failed: 0, error: 'Brevo not configured' };
+    const config = this.getEmailConfigStatus();
+    if (!config.ok) {
+      return { attempted: 0, sent: 0, failed: 0, error: `Brevo not configured: ${config.reason}` };
     }
 
     let query = this.supabase
@@ -67,6 +78,7 @@ class PromoService {
 
     let sent = 0;
     let failed = 0;
+    const errorSamples = [];
 
     for (const item of recipients) {
       const promo = item.promotions;
@@ -89,10 +101,19 @@ class PromoService {
       } catch (err) {
         await this._markRecipient(item.id, 'failed');
         failed += 1;
+        if (errorSamples.length < 3 && err?.message) {
+          errorSamples.push(err.message);
+        }
       }
     }
 
-    return { attempted: recipients.length, sent, failed };
+    return {
+      attempted: recipients.length,
+      sent,
+      failed,
+      error: errorSamples.length ? errorSamples[0] : null,
+      errorSamples,
+    };
   }
 
   async _markRecipient(id, status) {
@@ -108,7 +129,11 @@ class PromoService {
   }
 
   async _sendBrevoEmail({ toEmail, toName, subject, html }) {
-    const res = await fetch('https://api.brevo.com/v3/smtp/email', {
+    const fetchFn = typeof fetch === 'function'
+      ? fetch
+      : (await import('node-fetch')).default;
+
+    const res = await fetchFn('https://api.brevo.com/v3/smtp/email', {
       method: 'POST',
       headers: {
         'api-key': this.brevoApiKey,

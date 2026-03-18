@@ -363,6 +363,24 @@ app.put('/api/notifications/:id/read', verifyJwt, async (req, res, next) => {
   }
 });
 
+app.delete('/api/notifications/:id', verifyJwt, async (req, res, next) => {
+  try {
+    await notificationService.deleteOne(req.params.id, req.user.id);
+    res.json({ success: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.delete('/api/notifications', verifyJwt, async (req, res, next) => {
+  try {
+    await notificationService.deleteAll(req.user.id);
+    res.json({ success: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
 // ── Chat / Conversations ──
 app.post('/api/conversations', verifyJwt, async (req, res, next) => {
   try {
@@ -468,6 +486,185 @@ app.put('/api/conversations/:id/read', verifyJwt, async (req, res, next) => {
   try {
     await chatService.markMessagesRead(req.params.id, req.user.id);
     res.json({ success: true });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/api/messages/:id/report', verifyJwt, async (req, res, next) => {
+  try {
+    const { reason } = req.body;
+    if (!reason || !reason.trim()) {
+      const err = new Error('Please provide a report reason.');
+      err.status = 400;
+      throw err;
+    }
+
+    const { data: msg, error: msgErr } = await supabase
+      .from('messages')
+      .select('id, conversation_id, sender_id')
+      .eq('id', req.params.id)
+      .single();
+
+    if (msgErr || !msg) {
+      const err = new Error('Message not found.');
+      err.status = 404;
+      throw err;
+    }
+
+    const { data: conv, error: convErr } = await supabase
+      .from('conversations')
+      .select('buyer_id, seller_id')
+      .eq('id', msg.conversation_id)
+      .single();
+
+    if (convErr || !conv) {
+      const err = new Error('Conversation not found.');
+      err.status = 404;
+      throw err;
+    }
+
+    if (conv.buyer_id !== req.user.id && conv.seller_id !== req.user.id) {
+      const err = new Error('Not a participant in this conversation.');
+      err.status = 403;
+      throw err;
+    }
+
+    const { data, error } = await supabase
+      .from('message_reports')
+      .insert({
+        message_id: msg.id,
+        conversation_id: msg.conversation_id,
+        reporter_id: req.user.id,
+        reported_user_id: msg.sender_id,
+        reason: reason.trim(),
+        status: 'open'
+      })
+      .select('id, reason, status, created_at')
+      .single();
+
+    if (error) throw error;
+
+    await auditService.log({
+      actorId: req.user.id,
+      action: 'message.reported',
+      entityType: 'message',
+      entityId: msg.id,
+      metadata: { reportId: data.id }
+    });
+
+    res.status(201).json({ success: true, data });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/api/conversations/:id/report', verifyJwt, async (req, res, next) => {
+  try {
+    const { reason } = req.body;
+    if (!reason || !reason.trim()) {
+      const err = new Error('Please provide a report reason.');
+      err.status = 400;
+      throw err;
+    }
+
+    const { data: conv, error: convErr } = await supabase
+      .from('conversations')
+      .select('id, buyer_id, seller_id')
+      .eq('id', req.params.id)
+      .single();
+
+    if (convErr || !conv) {
+      const err = new Error('Conversation not found.');
+      err.status = 404;
+      throw err;
+    }
+
+    if (conv.buyer_id !== req.user.id && conv.seller_id !== req.user.id) {
+      const err = new Error('Not a participant in this conversation.');
+      err.status = 403;
+      throw err;
+    }
+
+    const reportedUserId = conv.buyer_id === req.user.id ? conv.seller_id : conv.buyer_id;
+
+    const { data, error } = await supabase
+      .from('conversation_reports')
+      .insert({
+        conversation_id: conv.id,
+        reporter_id: req.user.id,
+        reported_user_id: reportedUserId,
+        reason: reason.trim(),
+        status: 'open'
+      })
+      .select('id, reason, status, created_at')
+      .single();
+
+    if (error) throw error;
+
+    await auditService.log({
+      actorId: req.user.id,
+      action: 'conversation.reported',
+      entityType: 'conversation',
+      entityId: conv.id,
+      metadata: { reportId: data.id }
+    });
+
+    res.status(201).json({ success: true, data });
+  } catch (error) {
+    next(error);
+  }
+});
+
+app.post('/api/users/:id/report', verifyJwt, async (req, res, next) => {
+  try {
+    const { reason } = req.body;
+    if (!reason || !reason.trim()) {
+      const err = new Error('Please provide a report reason.');
+      err.status = 400;
+      throw err;
+    }
+
+    if (req.user.id === req.params.id) {
+      const err = new Error('You cannot report your own account.');
+      err.status = 400;
+      throw err;
+    }
+
+    const { data: target, error: targetErr } = await supabase
+      .from('users')
+      .select('id')
+      .eq('id', req.params.id)
+      .single();
+
+    if (targetErr || !target) {
+      const err = new Error('User not found.');
+      err.status = 404;
+      throw err;
+    }
+
+    const { data, error } = await supabase
+      .from('account_reports')
+      .insert({
+        reporter_id: req.user.id,
+        reported_user_id: req.params.id,
+        reason: reason.trim(),
+        status: 'open'
+      })
+      .select('id, reason, status, created_at')
+      .single();
+
+    if (error) throw error;
+
+    await auditService.log({
+      actorId: req.user.id,
+      action: 'account.reported',
+      entityType: 'user',
+      entityId: req.params.id,
+      metadata: { reportId: data.id }
+    });
+
+    res.status(201).json({ success: true, data });
   } catch (error) {
     next(error);
   }

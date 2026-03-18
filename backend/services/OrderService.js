@@ -21,7 +21,7 @@ class OrderService {
       throw err;
     }
 
-    if (product.status !== 'available' && product.quantity <= 0) {
+    if (product.quantity <= 0) {
       const err = new Error('This product is out of stock.');
       err.status = 400;
       throw err;
@@ -197,7 +197,6 @@ class OrderService {
     if (!prodErr && product) {
       const newQuantity = Math.max(0, product.quantity - 1);
       const newStatus = newQuantity === 0 ? 'sold' : 'available';
-
       await this.supabase
         .from('products')
         .update({ quantity: newQuantity, status: newStatus })
@@ -249,7 +248,7 @@ class OrderService {
   async markAsShipped(orderId, sellerId) {
     const { data: order, error: findErr } = await this.supabase
       .from('orders')
-      .select('id, status, seller_id')
+      .select('id, status, seller_id, product_id')
       .eq('id', orderId)
       .single();
 
@@ -322,6 +321,21 @@ class OrderService {
       .single();
 
     if (updateErr) throw updateErr;
+
+    // If inventory is depleted, ensure product is marked sold
+    const { data: product } = await this.supabase
+      .from('products')
+      .select('quantity')
+      .eq('id', order.product_id)
+      .single();
+
+    if (product && Number(product.quantity) <= 0) {
+      await this.supabase
+        .from('products')
+        .update({ status: 'sold' })
+        .eq('id', order.product_id);
+    }
+
     return updated;
   }
 

@@ -46,6 +46,25 @@ class NotificationService {
         if (error) throw error;
     }
 
+    async deleteOne(notificationId, userId) {
+        const { error } = await this.supabase
+            .from('notifications')
+            .delete()
+            .eq('id', notificationId)
+            .eq('user_id', userId);
+
+        if (error) throw error;
+    }
+
+    async deleteAll(userId) {
+        const { error } = await this.supabase
+            .from('notifications')
+            .delete()
+            .eq('user_id', userId);
+
+        if (error) throw error;
+    }
+
     async getUnreadCount(userId) {
         const { count, error } = await this.supabase
             .from('notifications')

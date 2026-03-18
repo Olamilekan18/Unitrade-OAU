@@ -19,8 +19,8 @@ class ProductService {
     return this._mapProductRatings(data);
   }
 
-  async getAvailableProducts() {
-    const { data, error } = await this.supabase
+  async getAvailableProducts({ search, categoryId } = {}) {
+    let query = this.supabase
       .from('products')
       .select(`
         id, title, price, description, image_url, status, quantity, created_at,
@@ -28,8 +28,20 @@ class ProductService {
         users:seller_id(id, name, department, store_name, is_verified, avatar_url, address, user_reviews!user_reviews_seller_id_fkey(rating)),
         reviews(rating)
       `)
-      .eq('status', 'available')
-      .order('created_at', { ascending: false });
+      .eq('status', 'available');
+
+    if (categoryId) {
+      query = query.eq('category_id', categoryId);
+    }
+
+    if (search) {
+      query = query.textSearch('search_vector', search, {
+        config: 'english',
+        type: 'websearch'
+      });
+    }
+
+    const { data, error } = await query.order('created_at', { ascending: false });
 
     if (error) throw error;
     return data.map(this._mapProductRatings);

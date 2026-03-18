@@ -69,6 +69,22 @@ class AdminController {
     }
   }
 
+  static async deleteProduct(req, res, next) {
+    try {
+      const data = await adminService.deleteProduct(req.params.id);
+      await auditService.log({
+        actorId: req.user.id,
+        action: 'admin.product.deleted',
+        entityType: 'product',
+        entityId: data.id,
+        metadata: { title: data.title }
+      });
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
   static async listOrders(req, res, next) {
     try {
       const data = await adminService.listOrders();
@@ -81,6 +97,60 @@ class AdminController {
   static async listAuditLogs(req, res, next) {
     try {
       const data = await adminService.listAuditLogs();
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async listMessages(req, res, next) {
+    try {
+      const data = await adminService.listMessages({ search: req.query.q });
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async listConversations(req, res, next) {
+    try {
+      const data = await adminService.listConversations();
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async listConversationMessages(req, res, next) {
+    try {
+      const data = await adminService.listConversationMessages(req.params.id);
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async listMessageReports(req, res, next) {
+    try {
+      const data = await adminService.listMessageReports();
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async listConversationReports(req, res, next) {
+    try {
+      const data = await adminService.listConversationReports();
+      res.json({ success: true, data });
+    } catch (error) {
+      next(error);
+    }
+  }
+
+  static async listAccountReports(req, res, next) {
+    try {
+      const data = await adminService.listAccountReports();
       res.json({ success: true, data });
     } catch (error) {
       next(error);
@@ -137,6 +207,14 @@ class AdminController {
   static async sendPromotion(req, res, next) {
     try {
       const { title, message, audience, userIds, sendEmail } = req.body;
+      if (sendEmail) {
+        const config = promoService.getEmailConfigStatus?.();
+        if (config && !config.ok) {
+          const err = new Error(`Email not configured: ${config.reason}`);
+          err.status = 400;
+          throw err;
+        }
+      }
       const users = await adminService.createPromotion({ title, message, audience, userIds });
 
       const promotion = await promoService.createPromotion({
@@ -177,6 +255,8 @@ class AdminController {
           queued,
           sentNow: batchResult.sent,
           failedNow: batchResult.failed,
+          emailError: batchResult.error || null,
+          emailErrorSamples: batchResult.errorSamples || [],
         },
       });
     } catch (error) {
