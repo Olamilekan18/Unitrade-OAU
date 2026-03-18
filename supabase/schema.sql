@@ -298,3 +298,18 @@ create policy "No client access to promotion recipients"
 update public.users
 set role = 'super_admin'
 where oau_email = 'olamilekankareem@student.oauife.edu.ng';
+
+-- Create table to track blacklisted JWT tokens
+create table if not exists public.blacklisted_tokens (
+  id uuid primary key default gen_random_uuid(),
+  jti text not null unique,
+  expires_at timestamptz not null,
+  created_at timestamptz not null default now()
+);
+
+create index if not exists idx_blacklisted_tokens_jti on public.blacklisted_tokens(jti);
+alter table public.blacklisted_tokens enable row level security;
+create policy "No client access to blacklisted tokens" on public.blacklisted_tokens for select using (false);
+
+-- Add auth_failures tracking column
+alter table public.users add column if not exists auth_failures integer not null default 0;
