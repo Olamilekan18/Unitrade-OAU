@@ -26,8 +26,15 @@ async function apiFetch(endpoint, options = {}) {
 }
 
 /* ── Products ── */
-export async function fetchProducts() {
-  return apiFetch('/products');
+export async function fetchProducts(params = {}) {
+  const filtered = Object.entries(params).reduce((acc, [key, value]) => {
+    if (value !== undefined && value !== null && String(value).trim() !== '') {
+      acc[key] = value;
+    }
+    return acc;
+  }, {});
+  const query = new URLSearchParams(filtered).toString();
+  return apiFetch(`/products${query ? `?${query}` : ''}`);
 }
 
 export async function fetchProduct(id) {
@@ -163,6 +170,14 @@ export async function markAllNotificationsRead() {
   return apiFetch('/notifications/read-all', { method: 'PUT' });
 }
 
+export async function deleteNotification(id) {
+  return apiFetch(`/notifications/${id}`, { method: 'DELETE' });
+}
+
+export async function deleteAllNotifications() {
+  return apiFetch('/notifications', { method: 'DELETE' });
+}
+
 /* ── Chat / Conversations ── */
 export async function createConversation(sellerId, productId) {
   return apiFetch('/conversations', {
@@ -196,8 +211,64 @@ export async function rejectOffer(messageId) {
   return apiFetch(`/messages/${messageId}/reject`, { method: 'PUT' });
 }
 
+export async function reportMessage(messageId, reason) {
+  return apiFetch(`/messages/${messageId}/report`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ reason }),
+  });
+}
+
+export async function reportConversation(conversationId, reason) {
+  return apiFetch(`/conversations/${conversationId}/report`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ reason }),
+  });
+}
+
+export async function reportUser(userId, reason) {
+  return apiFetch(`/users/${userId}/report`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ reason }),
+  });
+}
+
 export async function markConversationRead(conversationId) {
   return apiFetch(`/conversations/${conversationId}/read`, { method: 'PUT' });
+}
+
+/* ── Admin: Messages & Reports ── */
+export async function fetchAdminMessages(params = {}) {
+  const filtered = Object.entries(params).reduce((acc, [key, value]) => {
+    if (value !== undefined && value !== null && String(value).trim() !== '') {
+      acc[key] = value;
+    }
+    return acc;
+  }, {});
+  const query = new URLSearchParams(filtered).toString();
+  return apiFetch(`/admin/messages${query ? `?${query}` : ''}`);
+}
+
+export async function fetchAdminMessageReports() {
+  return apiFetch('/admin/message-reports');
+}
+
+export async function fetchAdminConversations() {
+  return apiFetch('/admin/conversations');
+}
+
+export async function fetchAdminConversationMessages(conversationId) {
+  return apiFetch(`/admin/conversations/${conversationId}/messages`);
+}
+
+export async function fetchAdminConversationReports() {
+  return apiFetch('/admin/conversation-reports');
+}
+
+export async function fetchAdminAccountReports() {
+  return apiFetch('/admin/account-reports');
 }
 
 /* ── Orders ── */
@@ -340,6 +411,10 @@ export async function adminUpdateProductStatus(productId, status) {
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ status }),
   });
+}
+
+export async function adminDeleteProduct(productId) {
+  return apiFetch(`/admin/products/${productId}`, { method: 'DELETE' });
 }
 
 export async function fetchAdminOrders() {

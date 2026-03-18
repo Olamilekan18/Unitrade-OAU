@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { FaBoxOpen, FaSpinner } from 'react-icons/fa';
 import { fetchProducts } from '../utils/api';
 import ProductCard from './ProductCard';
@@ -8,35 +8,38 @@ function MarketplaceFeed({ searchQuery, selectedCategory }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
+  const trimmedQuery = useMemo(() => (searchQuery || '').trim(), [searchQuery]);
+
   useEffect(() => {
-    async function loadProducts() {
+    let isActive = true;
+    const timeout = setTimeout(async () => {
       try {
         setLoading(true);
-        const payload = await fetchProducts();
+        setError('');
+        const payload = await fetchProducts({
+          q: trimmedQuery || undefined,
+          category: selectedCategory || undefined
+        });
+        if (!isActive) return;
         setProducts(payload.data || []);
       } catch (err) {
-        setError(err.message);
+        if (!isActive) return;
+        const message = err?.message || 'Unable to load products right now.';
+        const friendly = message.toLowerCase().includes('fetch')
+          ? 'Network error. Please check your connection and try again.'
+          : message;
+        setError(friendly);
       } finally {
+        if (!isActive) return;
         setLoading(false);
       }
-    }
+    }, trimmedQuery ? 300 : 0);
 
-    loadProducts();
-  }, []);
-
-  // Client-side filtering
-  const filtered = products.filter((product) => {
-    const matchesSearch =
-      !searchQuery ||
-      product.title.toLowerCase().includes(searchQuery.toLowerCase());
-
-    const matchesCategory =
-      selectedCategory === null ||
-      selectedCategory === undefined ||
-      product.categories?.id === selectedCategory;
-
-    return matchesSearch && matchesCategory;
-  });
+    return () => {
+      isActive = false;
+      clearTimeout(timeout);
+    };
+  }, [trimmedQuery, selectedCategory]);
 
   if (loading) {
     return (
@@ -55,7 +58,7 @@ function MarketplaceFeed({ searchQuery, selectedCategory }) {
     );
   }
 
-  if (error) {
+  if (error && !products.length) {
     return (
       <div className="state-block">
         <FaSpinner />
@@ -64,7 +67,7 @@ function MarketplaceFeed({ searchQuery, selectedCategory }) {
     );
   }
 
-  if (!filtered.length) {
+  if (!products.length) {
     return (
       <div className="state-block">
         <FaBoxOpen />
@@ -78,11 +81,18 @@ function MarketplaceFeed({ searchQuery, selectedCategory }) {
   }
 
   return (
-    <div className="product-grid stagger">
-      {filtered.map((product) => (
-        <ProductCard key={product.id} product={product} />
-      ))}
-    </div>
+    <>
+      {error && (
+        <div className="alert alert-error" style={{ marginBottom: 'var(--space-4, 1rem)' }}>
+          {error}
+        </div>
+      )}
+      <div className="product-grid stagger">
+        {products.map((product) => (
+          <ProductCard key={product.id} product={product} />
+        ))}
+      </div>
+    </>
   );
 }
 

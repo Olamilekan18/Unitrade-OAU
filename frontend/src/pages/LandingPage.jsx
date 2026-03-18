@@ -178,6 +178,55 @@ function LandingPage() {
                 </div>
             </section>
 
+            <section className="landing-escrow">
+                <div className="container landing-escrow-grid">
+                    <div className="landing-escrow-card">
+                        <p className="landing-eyebrow">Escrow Protection</p>
+                        <h2>Payment stays safe until both sides are happy.</h2>
+                        <p>
+                            When a buyer pays, the money is held securely in escrow. The seller is assured the funds
+                            are real, and the buyer is protected until the item is received and confirmed.
+                        </p>
+                        <div className="landing-escrow-points">
+                            <div>
+                                <strong>Buyers</strong>
+                                <span>Your payment is protected until you confirm the handoff.</span>
+                            </div>
+                            <div>
+                                <strong>Sellers</strong>
+                                <span>Get paid faster with verified funds waiting in escrow.</span>
+                            </div>
+                        </div>
+                        <Link to="/request-access" className="btn btn-primary btn-lg">
+                            Start Trading Safely <FaArrowRight />
+                        </Link>
+                    </div>
+                    <div className="landing-escrow-panel">
+                        <div className="landing-escrow-step">
+                            <span>01</span>
+                            <div>
+                                <h3>Buyer pays once</h3>
+                                <p>Funds are locked securely, no awkward transfers.</p>
+                            </div>
+                        </div>
+                        <div className="landing-escrow-step">
+                            <span>02</span>
+                            <div>
+                                <h3>Meet and verify</h3>
+                                <p>Both parties confirm the item and exchange.</p>
+                            </div>
+                        </div>
+                        <div className="landing-escrow-step">
+                            <span>03</span>
+                            <div>
+                                <h3>Seller gets paid</h3>
+                                <p>Escrow releases immediately after confirmation.</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </section>
+
             <section className="landing-categories">
                 <div className="container">
                     <div className="landing-section-heading">
@@ -289,7 +338,7 @@ function LandingPage() {
                         <Link to="/request-access" className="btn btn-lg btn-white">
                             Request Access <FaArrowRight />
                         </Link>
-                        <Link to="/marketplace" className="btn btn-lg btn-ghost">
+                        <Link to="/marketplace" className="btn btn-lg btn-outline">
                             Browse Listings
                         </Link>
                     </div>

@@ -27,6 +27,7 @@ function Footer() {
                         <Link to="/marketplace">Marketplace</Link>
                         <Link to="/sell">Sell an Item</Link>
                         <Link to="/request-access">Request Access</Link>
+                        <Link to="/terms">Terms &amp; Conditions</Link>
                     </div>
 
                     <div className="footer-column">
@@ -42,6 +43,9 @@ function Footer() {
                     <p>
                         &copy; {year} UniTrade OAU. Made with <FaHeart style={{ color: '#ef4444', verticalAlign: 'middle', fontSize: '0.7rem' }} /> by OAU Students.
                     </p>
+                    <div className="footer-legal">
+                        <Link to="/terms">Terms &amp; Conditions</Link>
+                    </div>
                 </div>
             </div>
         </footer>

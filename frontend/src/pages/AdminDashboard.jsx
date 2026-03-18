@@ -23,9 +23,15 @@ import {
   adminSetRole,
   fetchAdminProducts,
   adminUpdateProductStatus,
+  adminDeleteProduct,
   fetchAdminOrders,
   fetchAuditLogs,
   sendPromotion,
+  fetchAdminConversations,
+  fetchAdminConversationMessages,
+  fetchAdminMessageReports,
+  fetchAdminConversationReports,
+  fetchAdminAccountReports,
 } from '../utils/api';
 
 const tabs = [
@@ -36,6 +42,8 @@ const tabs = [
   { id: 'listings', label: 'Listings' },
   { id: 'orders', label: 'Orders' },
   { id: 'promotions', label: 'Promotions' },
+  { id: 'messages', label: 'Messages' },
+  { id: 'reports', label: 'Reports' },
   { id: 'logs', label: 'Activity Log' },
 ];
 
@@ -49,6 +57,13 @@ function AdminDashboard() {
   const [products, setProducts] = useState([]);
   const [orders, setOrders] = useState([]);
   const [logs, setLogs] = useState([]);
+  const [adminConversations, setAdminConversations] = useState([]);
+  const [activeAdminConv, setActiveAdminConv] = useState(null);
+  const [adminConvMessages, setAdminConvMessages] = useState([]);
+  const [adminChatLoading, setAdminChatLoading] = useState(false);
+  const [reports, setReports] = useState([]);
+  const [conversationReports, setConversationReports] = useState([]);
+  const [accountReports, setAccountReports] = useState([]);
   const [status, setStatus] = useState({ loading: true, error: '' });
   const [userSearch, setUserSearch] = useState('');
   const [promo, setPromo] = useState({ title: '', message: '', audience: 'all', userIds: '', sendEmail: false });
@@ -146,6 +161,47 @@ function AdminDashboard() {
     }
   }
 
+  async function loadMessages() {
+    try {
+      setStatus({ loading: true, error: '' });
+      const res = await fetchAdminConversations();
+      setAdminConversations(res.data || []);
+      setStatus({ loading: false, error: '' });
+    } catch (err) {
+      setStatus({ loading: false, error: err.message });
+    }
+  }
+
+  async function openAdminConversation(conv) {
+    try {
+      setActiveAdminConv(conv);
+      setAdminChatLoading(true);
+      const res = await fetchAdminConversationMessages(conv.id);
+      setAdminConvMessages(res.data || []);
+    } catch (err) {
+      setStatus({ loading: false, error: err.message });
+    } finally {
+      setAdminChatLoading(false);
+    }
+  }
+
+  async function loadReports() {
+    try {
+      setStatus({ loading: true, error: '' });
+      const [messageRes, convoRes, accountRes] = await Promise.all([
+        fetchAdminMessageReports(),
+        fetchAdminConversationReports(),
+        fetchAdminAccountReports()
+      ]);
+      setReports(messageRes.data || []);
+      setConversationReports(convoRes.data || []);
+      setAccountReports(accountRes.data || []);
+      setStatus({ loading: false, error: '' });
+    } catch (err) {
+      setStatus({ loading: false, error: err.message });
+    }
+  }
+
   useEffect(() => {
     if (!isAuthenticated || !isAdmin) return;
     if (activeTab === 'users') loadUsers();
@@ -154,6 +210,8 @@ function AdminDashboard() {
     if (activeTab === 'listings') loadProducts();
     if (activeTab === 'orders') loadOrders();
     if (activeTab === 'logs') loadLogs();
+    if (activeTab === 'messages') loadMessages();
+    if (activeTab === 'reports') loadReports();
     if (activeTab === 'overview') loadOverview();
   }, [activeTab, isAuthenticated, isAdmin]);
 
@@ -233,6 +291,8 @@ function AdminDashboard() {
     setActioning((prev) => ({ ...prev, [id]: true }));
     try {
       await adminApproveUser(id);
+      setAccessRequests((prev) => prev.filter((req) => req.id !== id));
+      setAccessAction((prev) => ({ ...prev, [id]: '' }));
       await loadAccessRequests();
     } catch (err) {
       setStatus({ loading: false, error: err.message });
@@ -308,6 +368,20 @@ function AdminDashboard() {
     }
   }
 
+  async function handleDeleteProduct(id) {
+    const confirmed = window.confirm('Delete this listing? This cannot be undone.');
+    if (!confirmed) return;
+    setActioning((prev) => ({ ...prev, [id]: true }));
+    try {
+      await adminDeleteProduct(id);
+      setProducts((prev) => prev.filter((p) => p.id !== id));
+    } catch (err) {
+      setStatus({ loading: false, error: err.message });
+    } finally {
+      setActioning((prev) => ({ ...prev, [id]: false }));
+    }
+  }
+
   async function handleUserAction(id) {
     const action = userAction[id];
     if (!action) return;
@@ -340,6 +414,9 @@ function AdminDashboard() {
     if (action === 'toggle_status') {
       await handleProductStatus(id, currentStatus === 'available' ? 'sold' : 'available');
     }
+    if (action === 'delete') {
+      await handleDeleteProduct(id);
+    }
   }
 
   async function handleAccessAction(id) {
@@ -368,7 +445,9 @@ function AdminDashboard() {
       const sentNow = res.data.sentNow ?? 0;
       const queued = res.data.queued ?? res.data.count ?? 0;
       const failedNow = res.data.failedNow ?? 0;
-      setPromoResult(`Promotion queued for ${queued} users. Sent now: ${sentNow}. Failed: ${failedNow}.`);
+      const baseMsg = `Promotion queued for ${queued} users. Sent now: ${sentNow}. Failed: ${failedNow}.`;
+      const emailErr = res.data.emailError ? ` Email error: ${res.data.emailError}` : '';
+      setPromoResult(baseMsg + emailErr);
       setPromo({ title: '', message: '', audience: 'all', userIds: '', sendEmail: false });
     } catch (err) {
       setPromoResult(err.message);
@@ -517,18 +596,18 @@ function AdminDashboard() {
                   </div>
                   {users.map((u) => (
                     <div key={u.id} className="admin-table-row">
-                      <div>
+                      <div className="admin-cell" data-label="User">
                         <strong>{u.name}</strong>
                         <p>{u.oau_email}</p>
                       </div>
-                      <div>
+                      <div className="admin-cell" data-label="Status">
                         <span className={`admin-pill ${u.access_status === 'approved' ? 'success' : 'warning'}`}>
                           {u.access_status}
                         </span>
                         {u.is_blocked && <span className="admin-pill danger">Blocked</span>}
                         {u.suspended_until && <span className="admin-pill warning">Suspended</span>}
                       </div>
-                      <div>
+                      <div className="admin-cell" data-label="Role">
                         {isSuperAdmin ? (
                           <select
                             className="input"
@@ -544,7 +623,7 @@ function AdminDashboard() {
                           <span>{u.role}</span>
                         )}
                       </div>
-                      <div className="admin-actions">
+                      <div className="admin-cell admin-actions" data-label="Actions">
                         <select
                           className="input"
                           value={userAction[u.id] || ''}
@@ -597,16 +676,19 @@ function AdminDashboard() {
                   </div>
                   {accessRequests.map((u) => (
                     <div key={u.id} className="admin-table-row">
-                      <div>
+                      <div className="admin-cell" data-label="User">
                         <strong>{u.name}</strong>
                         <p>{u.oau_email}</p>
                       </div>
-                      <span>{u.department}</span>
-                      <div className="admin-actions">
+                      <div className="admin-cell" data-label="Department">
+                        <span>{u.department}</span>
+                      </div>
+                      <div className="admin-cell admin-actions" data-label="Actions">
                         <select
                           className="input"
                           value={accessAction[u.id] || ''}
                           onChange={(e) => setAccessAction((prev) => ({ ...prev, [u.id]: e.target.value }))}
+                          disabled={actioning[u.id]}
                         >
                           <option value="">Select action</option>
                           <option value="approve">Approve access</option>
@@ -616,7 +698,7 @@ function AdminDashboard() {
                           onClick={() => handleAccessAction(u.id)}
                           disabled={actioning[u.id] || !accessAction[u.id]}
                         >
-                          {actioning[u.id] ? <FaSpinner className="spinner" /> : 'Apply'}
+                          {actioning[u.id] ? <><FaSpinner className="spinner" /> Applying...</> : 'Apply'}
                         </button>
                       </div>
                     </div>
@@ -639,21 +721,21 @@ function AdminDashboard() {
                   </div>
                   {verificationRequests.map((req) => (
                     <div key={req.id} className="admin-table-row admin-table-4">
-                      <div>
+                      <div className="admin-cell" data-label="User">
                         <strong>{req.user?.name || 'User'}</strong>
                         <p>{req.user?.oau_email}</p>
                       </div>
-                      <div>
+                      <div className="admin-cell" data-label="Reason">
                         <p>{req.reason}</p>
                       </div>
-                      <div>
+                      <div className="admin-cell" data-label="Proof">
                         {req.proof_url ? (
                           <a href={req.proof_url} target="_blank" rel="noreferrer">View proof</a>
                         ) : (
                           <span className="admin-pill">No proof</span>
                         )}
                       </div>
-                      <div className="admin-actions">
+                      <div className="admin-cell admin-actions" data-label="Actions">
                         <button
                           className="btn btn-outline"
                           onClick={() => handleVerify(req.user?.id)}
@@ -682,18 +764,20 @@ function AdminDashboard() {
                   </div>
                   {products.map((p) => (
                     <div key={p.id} className="admin-table-row">
-                      <div>
+                      <div className="admin-cell" data-label="Listing">
                         <strong>{p.title}</strong>
                         <p>{p.categories?.name || 'General'} · ₦{Number(p.price).toLocaleString()}</p>
                       </div>
-                      <span className={`admin-pill ${p.status === 'available' ? 'success' : 'warning'}`}>
-                        {p.status}
-                      </span>
-                      <div>
+                      <div className="admin-cell" data-label="Status">
+                        <span className={`admin-pill ${p.status === 'available' ? 'success' : 'warning'}`}>
+                          {p.status}
+                        </span>
+                      </div>
+                      <div className="admin-cell" data-label="Seller">
                         <strong>{p.users?.store_name || p.users?.name || 'Seller'}</strong>
                         <p>{p.users?.oau_email}</p>
                       </div>
-                      <div className="admin-actions">
+                      <div className="admin-cell admin-actions" data-label="Actions">
                         <select
                           className="input"
                           value={productAction[p.id] || ''}
@@ -701,6 +785,7 @@ function AdminDashboard() {
                         >
                           <option value="">Select action</option>
                           <option value="toggle_status">Mark {p.status === 'available' ? 'Sold' : 'Available'}</option>
+                          <option value="delete">Delete listing</option>
                         </select>
                         <button
                           className="btn btn-outline"
@@ -730,16 +815,18 @@ function AdminDashboard() {
                   </div>
                   {orders.map((o) => (
                     <div key={o.id} className="admin-table-row">
-                      <div>
+                      <div className="admin-cell" data-label="Order">
                         <strong>{o.products?.title || 'Order'}</strong>
                         <p>₦{Number(o.amount).toLocaleString()}</p>
                       </div>
-                      <span className="admin-pill">{o.status}</span>
-                      <div>
+                      <div className="admin-cell" data-label="Status">
+                        <span className="admin-pill">{o.status}</span>
+                      </div>
+                      <div className="admin-cell" data-label="Buyer">
                         <strong>{o.buyer?.name || 'Buyer'}</strong>
                         <p>{o.buyer?.oau_email}</p>
                       </div>
-                      <div>
+                      <div className="admin-cell" data-label="Seller">
                         <strong>{o.seller?.name || 'Seller'}</strong>
                         <p>{o.seller?.oau_email}</p>
                       </div>
@@ -826,21 +913,101 @@ function AdminDashboard() {
                   </div>
                   {logs.map((log) => (
                     <div key={log.id} className="admin-table-row">
-                      <div>
+                      <div className="admin-cell" data-label="Action">
                         <strong>{log.action}</strong>
                         <p>{log.entity_type} · {log.entity_id || '—'}</p>
                       </div>
-                      <div>
+                      <div className="admin-cell" data-label="Actor">
                         <strong>{log.actor?.name || 'System'}</strong>
                         <p>{log.actor?.oau_email || ''}</p>
                       </div>
-                      <span>{new Date(log.created_at).toLocaleString()}</span>
+                      <div className="admin-cell" data-label="Time">
+                        <span>{new Date(log.created_at).toLocaleString()}</span>
+                      </div>
                     </div>
                   ))}
                 </div>
               </div>
             )}
-              </>
+
+            {activeTab === 'messages' && (
+  <div className="admin-section">
+    <div className="admin-section-header">
+      <h2>Messages</h2>
+    </div>
+    <div className="admin-chat-grid">
+      <div className="admin-chat-list">
+        {adminConversations.length === 0 ? (
+          <div className="admin-empty">No conversations yet.</div>
+        ) : (
+          adminConversations.map((conv) => {
+            const buyerName = conv.buyer?.name || 'Buyer';
+            const sellerName = conv.seller?.name || 'Seller';
+            const isActive = activeAdminConv?.id === conv.id;
+            return (
+              <button
+                key={conv.id}
+                type="button"
+                className={`admin-chat-item ${isActive ? 'active' : ''}`}
+                onClick={() => openAdminConversation(conv)}
+              >
+                <div className="admin-chat-item-title">
+                  {buyerName} ? {sellerName}
+                </div>
+                <div className="admin-chat-item-sub">
+                  {conv.product?.title || 'Conversation'}
+                </div>
+                <div className="admin-chat-item-preview">
+                  {conv.lastMessage?.content || (conv.lastMessage?.image_url ? '?? Image' : 'No messages yet')}
+                </div>
+                <div className="admin-chat-item-time">
+                  {new Date(conv.updated_at).toLocaleString()}
+                </div>
+              </button>
+            );
+          })
+        )}
+      </div>
+
+      <div className="admin-chat-thread">
+        {!activeAdminConv ? (
+          <div className="admin-empty">Select a conversation to view messages.</div>
+        ) : (
+          <>
+            <div className="admin-chat-thread-header">
+              <div>
+                <strong>{activeAdminConv.buyer?.name || 'Buyer'} ? {activeAdminConv.seller?.name || 'Seller'}</strong>
+                <div className="admin-chat-thread-sub">
+                  {activeAdminConv.product?.title || 'Conversation'}
+                </div>
+              </div>
+            </div>
+            <div className="admin-chat-messages">
+              {adminChatLoading ? (
+                <div className="admin-empty">Loading messages...</div>
+              ) : adminConvMessages.length === 0 ? (
+                <div className="admin-empty">No messages yet.</div>
+              ) : (
+                adminConvMessages.map((msg) => (
+                  <div key={msg.id} className="admin-chat-message">
+                    <div className="admin-chat-message-header">
+                      <strong>{msg.sender?.name || 'User'}</strong>
+                      <span>{new Date(msg.created_at).toLocaleString()}</span>
+                    </div>
+                    {msg.image_url && (
+                      <img src={msg.image_url} alt="attachment" className="admin-chat-image" />
+                    )}
+                    {msg.content && <p>{msg.content}</p>}
+                  </div>
+                ))
+              )}
+            </div>
+          </>
+        )}
+      </div>
+    </div>
+  </div>
+)}              </>
             )}
           </div>
         </div>
@@ -850,3 +1017,10 @@ function AdminDashboard() {
 }
 
 export default AdminDashboard;
+
+
+
+
+
+
+

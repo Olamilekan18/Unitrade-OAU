@@ -2,12 +2,14 @@ import { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import {
     FaBuilding, FaPhone, FaMapMarkerAlt, FaCheckCircle,
-    FaSpinner, FaArrowLeft, FaStore, FaCalendarAlt,
+    FaSpinner, FaArrowLeft, FaStore, FaCalendarAlt, FaFlag,
 } from 'react-icons/fa';
-import { getProfile, fetchSellerProducts } from '../utils/api';
+import { getProfile, fetchSellerProducts, reportUser } from '../utils/api';
+import { useAuth } from '../context/AuthContext';
 
 function UserProfilePage() {
     const { id } = useParams();
+    const { user } = useAuth();
     const [profile, setProfile] = useState(null);
     const [products, setProducts] = useState([]);
     const [loading, setLoading] = useState(true);
@@ -59,6 +61,18 @@ function UserProfilePage() {
     const defaultAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(profile.name)}&background=059669&color=fff&size=100`;
     const joined = new Date(profile.created_at).toLocaleDateString('en-NG', { year: 'numeric', month: 'long' });
 
+    async function handleReportAccount() {
+        if (!profile?.id) return;
+        const reason = window.prompt('Please describe the issue with this account:');
+        if (!reason || !reason.trim()) return;
+        try {
+            await reportUser(profile.id, reason.trim());
+            alert('Account report submitted. Our team will review it.');
+        } catch (err) {
+            alert(err.message || 'Failed to submit report.');
+        }
+    }
+
     return (
         <div className="create-listing-page">
             <div className="container" style={{ maxWidth: 720 }}>
@@ -84,6 +98,17 @@ function UserProfilePage() {
                                 <FaCheckCircle style={{ color: '#1d9bf0', fontSize: '1.1rem' }} title="Verified Seller" />
                             )}
                         </div>
+
+                        {user?.id && user.id !== profile.id && (
+                            <button
+                                type="button"
+                                onClick={handleReportAccount}
+                                className="btn btn-outline"
+                                style={{ marginTop: 'var(--space-3)', fontSize: '0.85rem' }}
+                            >
+                                <FaFlag /> Report Account
+                            </button>
+                        )}
 
                         {profile.store_name && (
                             <p style={{ color: 'var(--color-gray-500)', fontSize: 'var(--font-size-sm)' }}>{profile.name}</p>

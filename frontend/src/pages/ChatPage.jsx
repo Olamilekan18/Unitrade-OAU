@@ -2,12 +2,13 @@ import { useState, useEffect, useRef } from 'react';
 import { useSearchParams, Link } from 'react-router-dom';
 import {
     FaPaperPlane, FaSpinner, FaArrowLeft, FaCheckCircle,
-    FaComments, FaCircle, FaImage, FaTags, FaTimes
+    FaComments, FaCircle, FaImage, FaTags, FaTimes, FaFlag
 } from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext';
 import {
     fetchConversations, fetchMessages, sendMessage, createConversation,
-    uploadImage, acceptOffer, rejectOffer, createOrder
+    uploadImage, acceptOffer, rejectOffer, createOrder, reportMessage,
+    reportConversation, reportUser
 } from '../utils/api';
 
 function ChatPage() {
@@ -216,6 +217,41 @@ function ChatPage() {
         }
     }
 
+    async function handleReportMessage(messageId) {
+        const reason = window.prompt('Please describe the issue you are reporting:');
+        if (!reason || !reason.trim()) return;
+        try {
+            await reportMessage(messageId, reason.trim());
+            alert('Report submitted. Our team will review it.');
+        } catch (err) {
+            alert(err.message || 'Failed to submit report.');
+        }
+    }
+
+    async function handleReportConversation() {
+        if (!activeConv) return;
+        const reason = window.prompt('Please describe the issue with this chat:');
+        if (!reason || !reason.trim()) return;
+        try {
+            await reportConversation(activeConv.id, reason.trim());
+            alert('Chat report submitted. Our team will review it.');
+        } catch (err) {
+            alert(err.message || 'Failed to submit report.');
+        }
+    }
+
+    async function handleReportAccount(userId) {
+        if (!userId) return;
+        const reason = window.prompt('Please describe the issue with this account:');
+        if (!reason || !reason.trim()) return;
+        try {
+            await reportUser(userId, reason.trim());
+            alert('Account report submitted. Our team will review it.');
+        } catch (err) {
+            alert(err.message || 'Failed to submit report.');
+        }
+    }
+
     function goBackToList() {
         setMobileView('list');
         setActiveConv(null);
@@ -392,6 +428,44 @@ function ChatPage() {
                                                 </Link>
                                             )}
                                         </div>
+                                        <div style={{ marginLeft: 'auto', display: 'flex', gap: 8 }}>
+                                            <button
+                                                type="button"
+                                                onClick={handleReportConversation}
+                                                style={{
+                                                    background: 'var(--color-gray-50)',
+                                                    border: '1px solid var(--color-gray-200)',
+                                                    borderRadius: 999,
+                                                    padding: '6px 10px',
+                                                    fontSize: '0.75rem',
+                                                    color: 'var(--color-gray-600)',
+                                                    cursor: 'pointer',
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    gap: 6
+                                                }}
+                                            >
+                                                <FaFlag /> Report Chat
+                                            </button>
+                                            <button
+                                                type="button"
+                                                onClick={() => handleReportAccount(other?.id)}
+                                                style={{
+                                                    background: 'var(--color-gray-50)',
+                                                    border: '1px solid var(--color-gray-200)',
+                                                    borderRadius: 999,
+                                                    padding: '6px 10px',
+                                                    fontSize: '0.75rem',
+                                                    color: 'var(--color-gray-600)',
+                                                    cursor: 'pointer',
+                                                    display: 'inline-flex',
+                                                    alignItems: 'center',
+                                                    gap: 6
+                                                }}
+                                            >
+                                                <FaFlag /> Report Account
+                                            </button>
+                                        </div>
                                     </>
                                 );
                             })()}
@@ -481,6 +555,25 @@ function ChatPage() {
                                                 }}>
                                                     {formatTime(msg.created_at)}
                                                 </p>
+                                                {!isMine && (
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => handleReportMessage(msg.id)}
+                                                        style={{
+                                                            marginTop: 6,
+                                                            background: 'transparent',
+                                                            border: 'none',
+                                                            color: isMine ? 'rgba(255,255,255,0.8)' : 'var(--color-gray-400)',
+                                                            fontSize: '0.65rem',
+                                                            cursor: 'pointer',
+                                                            display: 'flex',
+                                                            alignItems: 'center',
+                                                            gap: 4
+                                                        }}
+                                                    >
+                                                        <FaFlag /> Report
+                                                    </button>
+                                                )}
                                             </div>
                                         </div>
                                     );

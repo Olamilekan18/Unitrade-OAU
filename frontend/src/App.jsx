@@ -15,6 +15,8 @@ import OrdersPage from './pages/OrdersPage';
 import WalletPage from './pages/WalletPage';
 import BidsPage from './pages/BidsPage';
 import AdminDashboard from './pages/AdminDashboard';
+import Notifications from './pages/Notifications';
+import TermsPage from './pages/TermsPage';
 
 function AppContent() {
   const location = useLocation();
@@ -35,6 +37,8 @@ function AppContent() {
         <Route path="/orders" element={<OrdersPage />} />
         <Route path="/wallet" element={<WalletPage />} />
         <Route path="/bids" element={<BidsPage />} />
+        <Route path="/notifications" element={<Notifications />} />
+        <Route path="/terms" element={<TermsPage />} />
         <Route path="/admin" element={<AdminDashboard />} />
         <Route path="/chat" element={<ChatPage />} />
       </Routes>

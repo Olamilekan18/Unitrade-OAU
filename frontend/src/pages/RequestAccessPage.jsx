@@ -1,10 +1,13 @@
 import { useState } from 'react';
 import { Link } from 'react-router-dom';
-import { FaPaperPlane, FaSpinner, FaCheckCircle, FaLock } from 'react-icons/fa';
+import { FaPaperPlane, FaSpinner, FaCheckCircle, FaLock, FaEye, FaEyeSlash } from 'react-icons/fa';
 import { requestAccess } from '../utils/api';
 
 function RequestAccessPage() {
     const [form, setForm] = useState({ name: '', oau_email: '', department: '', password: '', confirmPassword: '' });
+    const [acceptedTerms, setAcceptedTerms] = useState(false);
+    const [showPassword, setShowPassword] = useState(false);
+    const [showConfirmPassword, setShowConfirmPassword] = useState(false);
     const [error, setError] = useState('');
     const [success, setSuccess] = useState(false);
     const [loading, setLoading] = useState(false);
@@ -30,6 +33,11 @@ function RequestAccessPage() {
 
         if (form.password !== form.confirmPassword) {
             setError('Passwords do not match.');
+            return;
+        }
+
+        if (!acceptedTerms) {
+            setError('Please accept the Terms & Conditions to continue.');
             return;
         }
 
@@ -132,17 +140,27 @@ function RequestAccessPage() {
                             <FaLock style={{ marginRight: 6, verticalAlign: 'middle', fontSize: '0.8rem' }} />
                             Password
                         </label>
-                        <input
-                            id="password"
-                            name="password"
-                            type="password"
-                            className="input"
-                            placeholder="Min. 6 characters"
-                            value={form.password}
-                            onChange={handleChange}
-                            required
-                            minLength={6}
-                        />
+                        <div className="password-field">
+                            <input
+                                id="password"
+                                name="password"
+                                type={showPassword ? 'text' : 'password'}
+                                className="input"
+                                placeholder="Min. 6 characters"
+                                value={form.password}
+                                onChange={handleChange}
+                                required
+                                minLength={6}
+                            />
+                            <button
+                                type="button"
+                                className="password-toggle"
+                                onClick={() => setShowPassword((prev) => !prev)}
+                                aria-label={showPassword ? 'Hide password' : 'Show password'}
+                            >
+                                {showPassword ? <FaEyeSlash /> : <FaEye />}
+                            </button>
+                        </div>
                     </div>
 
                     <div className="input-group">
@@ -150,22 +168,45 @@ function RequestAccessPage() {
                             <FaLock style={{ marginRight: 6, verticalAlign: 'middle', fontSize: '0.8rem' }} />
                             Confirm Password
                         </label>
+                        <div className="password-field">
+                            <input
+                                id="confirmPassword"
+                                name="confirmPassword"
+                                type={showConfirmPassword ? 'text' : 'password'}
+                                className="input"
+                                placeholder="Re-enter your password"
+                                value={form.confirmPassword}
+                                onChange={handleChange}
+                                required
+                            />
+                            <button
+                                type="button"
+                                className="password-toggle"
+                                onClick={() => setShowConfirmPassword((prev) => !prev)}
+                                aria-label={showConfirmPassword ? 'Hide password' : 'Show password'}
+                            >
+                                {showConfirmPassword ? <FaEyeSlash /> : <FaEye />}
+                            </button>
+                        </div>
+                    </div>
+
+                    <div className="terms-check">
                         <input
-                            id="confirmPassword"
-                            name="confirmPassword"
-                            type="password"
-                            className="input"
-                            placeholder="Re-enter your password"
-                            value={form.confirmPassword}
-                            onChange={handleChange}
-                            required
+                            id="acceptTerms"
+                            type="checkbox"
+                            checked={acceptedTerms}
+                            onChange={(e) => setAcceptedTerms(e.target.checked)}
                         />
+                        <label htmlFor="acceptTerms">
+                            I agree to the{' '}
+                            <Link to="/terms">Terms &amp; Conditions</Link>.
+                        </label>
                     </div>
 
                     <button
                         type="submit"
                         className="btn btn-lg btn-primary"
-                        disabled={loading}
+                        disabled={loading || !acceptedTerms}
                     >
                         {loading ? (
                             <>
