@@ -1,0 +1,204 @@
+================================================================================
+         UNITRADE OAU — CAMPUS MARKETPLACE WEB APPLICATION
+                   Implementation Document
+================================================================================
+
+Course:        [Course Title / Code]
+Student Name:  [Your Full Name]
+Matric Number: [Your Matric Number]
+Department:    [Your Department]
+Date:          March 2026
+
+================================================================================
+1. THE BUILDING PHASE (HOW IT WAS BUILT)
+================================================================================
+
+The development of the UniTrade OAU platform was structured into three major 
+phases: Database Architecture, Backend API Development, and Frontend UI 
+Engineering. The project was built using the PERN stack equivalent (PostgreSQL, 
+Express.js, React.js, Node.js), with Supabase serving as the cloud database 
+and storage provider.
+
+1.1 Database Architecture (Supabase & PostgreSQL)
+The foundation of the project began with designing a relational database schema
+to handle users, marketplace listings, categories, reviews, and notifications. 
+I created a fully normalized PostgreSQL database hosted on Supabase.
+- Entities: Five core tables were designed—`users`, `products`, `categories`, 
+  `reviews`, `notifications`, and `verification_requests`.
+- Constraints & Integrity: I utilized foreign keys with `ON DELETE CASCADE` 
+  to ensure database integrity (e.g., if a user is deleted, their products 
+  and reviews are also removed). I used Check Constraints to validate data at 
+  the database level, such as ensuring product prices cannot be negative and 
+  ratings are strictly between 1 and 5.
+- Row Level Security (RLS): To secure the data, I enabled RLS on all tables. 
+  This ensures that users can only modify their own data. For example, a user 
+  cannot edit another user's product listing or delete someone else's review. 
+
+1.2 Backend API Development (Node.js & Express)
+The server-side application was built using Node.js and the Express.js framework.
+I adopted the Model-View-Controller (MVC) and Service-Oriented Architecture
+patterns to keep the codebase modular, testable, and maintainable.
+- Service Layer: Instead of writing database queries directly in route handlers, 
+  I created dedicated service classes (`UserService`, `ProductService`, 
+  `ReviewService`, `NotificationService`). Each class encapsulates specific 
+  business logic, making the code highly reusable.
+- File Uploads: I integrated `multer`, a middleware for handling `multipart/form-data`,
+  to process image uploads. When a user uploads a product image or profile avatar,
+  the backend receives the file and uploads it securely to Supabase Storage, 
+  returning a public URL that is saved to the database.
+- Email Integration: I integrated `nodemailer` to send automated HTML emails via 
+  SMTP. Whenever an admin approves a new user's access request or verifies a 
+  seller, the backend constructs a beautifully styled email template and sends 
+  it to the user's OAU email address.
+
+1.3 Frontend UI Engineering (React & Vite)
+The user interface was built as a single-page application (SPA) using React.js,
+bootstrapped with Vite for high performance and fast hot-module replacement.
+- Component-Based Design: The UI was broken down into highly reusable 
+  components such as `Navbar`, `ProductCard`, `CategoryFilter`, and `Footer`. 
+  This allowed me to build complex pages (`Marketplace`, `ProductDetail`) by 
+  composing these smaller pieces together.
+- Custom CSS Design System: Instead of relying on bulky CSS libraries like 
+  Bootstrap or Tailwind, I built a custom design system using native CSS 
+  variables (Custom Properties). I defined global tokens for colors 
+  (e.g., `--color-primary: #059669`), spacing, typography (Inter font), 
+  shadows, and border radii. This approach resulted in a highly cohesive, 
+  premium, and lightweight user interface.
+- Client-Side Routing: I used `react-router-dom` to handle navigation between 
+  pages without requiring a full page reload, providing a fast, app-like 
+  experience.
+
+================================================================================
+2. AUTHENTICATION & SECURITY
+================================================================================
+
+Building a secure, custom authentication system was a critical part of the 
+application, especially since the platform is exclusive to OAU students.
+
+2.1 The Custom Auth Flow
+Instead of using third-party Auth providers (like Google Auth or Firebase Auth),
+I implemented a robust, custom JWT-based authentication system from scratch.
+- Password Hashing: When a user registers, their plaintext password is never 
+  saved. The backend uses the `bcryptjs` library to generate a salt and hash 
+  the password (using 10 salt rounds) before storing it in the PostgreSQL database.
+- JWT Generation: Upon successful login (email and password verification), the 
+  Express server generates a JSON Web Token (JWT) signed with a secret key.
+  This token contains the user's ID as the payload and is set to expire in 24 hours.
+- HTTP-Only Cookies: To protect against Cross-Site Scripting (XSS) attacks, 
+  the JWT is *not* sent in the JSON response payload. Instead, the server 
+  sets it as a secure, `HttpOnly` cookie in the user's browser. This means 
+  malicious scripts cannot access the token.
+- API Protection: I wrote an `authMiddleware` function that intercepts incoming 
+  requests to protected routes (like creating a listing or updating a profile). 
+  It reads the JWT from the cookie, verifies the signature, decodes the user ID, 
+  and attaches the user object to the request. If the token is missing or 
+  invalid, it rejects the request with a 401 Unauthorized status.
+
+2.2 Access Approval Mechanism
+To maintain the exclusivity of the platform, registration is a two-step process:
+1. The student submits a "Request Access" form, which requires an OAU email 
+   address (ending in `oauife.edu.ng`). Their account is created with an 
+   `access_status` of "pending". They cannot log in yet.
+2. The user remains in this pending state until an admin changes their status 
+   to "approved" in the database. 
+3. Upon approval, the user receives an acceptance email, and the system now 
+   allows them to pass the login check.
+
+================================================================================
+3. DATA FLOW & SYSTEM ARCHITECTURE
+================================================================================
+
+The application utilizes a RESTful API architecture. The data flows seamlessly 
+between the client's browser, the Node.js backend, and the Supabase database.
+
+3.1 Client-Server Communication
+- When a user loads the application, the React `AuthContext` makes an immediate 
+  `GET /api/sessions/me` request to the backend to check if the user has a valid 
+  session cookie. 
+- If valid, the backend fetches the user's profile from Supabase and returns it 
+  to React, which updates the global state. All components (like the Navbar) 
+  instantly reflect the logged-in user's data.
+
+3.2 The Image Upload Flow
+- When a user uploads a product image, the file is selected via an HTML `<input>`.
+- React creates a local preview using `URL.createObjectURL(file)` so the user 
+  sees the image instantly.
+- The file is appended to a `FormData` object and sent to the backend via a 
+  `POST /api/uploads` request.
+- The Express `multer` middleware buffers the file in memory.
+- The backend then uses the Supabase Storage SDK to upload the file to a public 
+  bucket, retrieves the public URL, and returns it to the frontend.
+- Finally, the frontend attaches this URL to the product listing payload and 
+  saves the entire product to the database.
+
+3.3 Real-Time Features (Notifications)
+- The React application utilizes a polling strategy (or `useEffect` intervals) 
+  to periodically fetch notifications for the logged-in user via the 
+  `GET /api/notifications` endpoint.
+- As notifications are created on the backend (e.g., when an account is approved 
+  or verified), they are written to the database. 
+- The frontend fetches these updates and dynamically displays a red badge over 
+  the notification bell with the unread count.
+
+================================================================================
+4. HOW IT WORKS (CORE SYSTEM FUNCTIONALITY)
+================================================================================
+
+4.1 Marketplace Browsing & Search
+When a user (guest or authenticated) navigates to the Marketplace page, the 
+frontend fetches all available products. A skeleton loading state is displayed 
+while the network request resolves. 
+Users can use the real-time search bar that filters the returned products array 
+down instantly as they type. They can also click horizontal category chips 
+(e.g., "Electronics", "Textbooks") to filter the feed.
+
+4.2 Selling & Product Management
+Authenticated users can access the "Sell Item" page. They fill out a clean, 
+multi-step-like form providing the title, description, price, category, and 
+image. Upon submission, the API validates the input, ensures the price is not 
+negative, and associates the new product exclusively with the logged-in user's ID.
+The product instantly appears on the central marketplace feed.
+
+4.3 User Profiles & Seller Verification
+Every user is automatically provisioned a profile page. To protect privacy, 
+users can define a "Store Name" (e.g., "OlaBooks Store") that acts as an alias, 
+displaying on their public listings instead of their real name. 
+To establish trust on the campus marketplace, sellers can click "Request 
+Verification". They provide a reason justifying why they should be trusted 
+(e.g., "I have completed 50 successful sales"). Upon admin approval, the system 
+flips the `is_verified` boolean to true. This triggers an automated email to 
+the seller, an in-app notification, and a blue checkmark (✅) is dynamically 
+rendered next to their store name across the entire application.
+
+4.4 Reviews and Ratings
+A core feature of the marketplace is transparency. When a user navigates to a 
+Product Details page, they can see the seller's information and read reviews 
+left by previous buyers. 
+Authenticated users (who are not the seller themselves) can use an interactive 
+5-star rating component to review the product. The rating interface provides 
+immediate visual hover feedback. When submitted, the backend records the 
+rating, performs mathematical aggregation to update the product's overall 
+average rating score in real-time, and prepends the new review to the list.
+
+================================================================================
+5. CONCLUSION
+================================================================================
+
+The UniTrade OAU platform was successfully designed and built from the ground 
+up as a scalable, secure, and modern web application.
+
+By implementing custom authentication with bcrypt and HTTP-only cookies, the 
+platform ensures that student data remains secure. The strict access approval 
+flow guarantees the exclusivity of the campus marketplace. Advanced features 
+such as image uploading, automated email dispatching, in-app notifications, 
+and the blue checkmark verification system significantly elevate the user 
+experience, solving the core challenges students face when buying and selling 
+on campus. 
+
+The application adheres to software engineering best practices, utilizing a 
+modular MVC architecture on the backend, a highly reusable component structure 
+on the frontend, and rigorous security policies at the database layer.
+
+================================================================================
+                          END OF DOCUMENT
+================================================================================
