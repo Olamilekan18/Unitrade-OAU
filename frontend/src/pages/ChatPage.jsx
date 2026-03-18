@@ -291,7 +291,7 @@ function ChatPage() {
     const defaultAvatar = (name) => `https://ui-avatars.com/api/?name=${encodeURIComponent(name)}&background=059669&color=fff&size=48`;
 
     return (
-        <div style={{ display: 'flex', height: 'calc(100vh - var(--nav-height))', overflow: 'hidden', padding: 'var(--space-4)' }}>
+        <div className="chat-page">
             {/* ── Conversation List (Sidebar) ── */}
             <div style={{
                 width: 360, minWidth: 300, borderRight: '1px solid var(--color-gray-200)',

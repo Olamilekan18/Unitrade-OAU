@@ -127,6 +127,8 @@
         pointer-events: none;
         transition: all var(--transition-base);
         z-index: 99;
+        max-height: calc(100vh - var(--nav-height) - var(--space-8));
+        overflow-y: auto;
     }
 
     .navbar-links.open {
@@ -149,6 +151,45 @@
 
     .navbar-links a::after {
         display: none;
+    }
+
+    .navbar-user {
+        width: 100%;
+        flex-direction: column;
+        align-items: center;
+        gap: var(--space-3);
+    }
+
+    .navbar-user-name {
+        text-align: center;
+    }
+
+    .navbar-user .btn {
+        width: 100%;
+        justify-content: center;
+    }
+}
+
+/* ─────────────────────────────────
+   CHAT PAGE
+   ───────────────────────────────── */
+.chat-page {
+    display: flex;
+    height: calc(100vh - var(--nav-height));
+    min-height: calc(100vh - var(--nav-height));
+    height: calc(100dvh - var(--nav-height));
+    min-height: calc(100dvh - var(--nav-height));
+    overflow: hidden;
+    padding: var(--space-4);
+}
+
+@media (max-width: 768px) {
+    .chat-page {
+        padding: 0;
+    }
+
+    .chat-thread {
+        min-height: 0;
     }
 }
 
