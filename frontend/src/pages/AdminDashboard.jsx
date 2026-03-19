@@ -11,6 +11,7 @@ import {
   FaChartBar,
 } from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext';
+import { AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
 import {
   fetchAdminSummary,
   fetchAdminUsers,
@@ -109,6 +110,13 @@ function AdminDashboard() {
       return { label: 'verified', tone: 'success' };
     }
     return { label: 'approved', tone: 'success' };
+  }
+
+  function formatDate(value) {
+    if (!value) return '—';
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) return '—';
+    return date.toLocaleDateString();
   }
 
   async function loadOverview() {
@@ -451,7 +459,7 @@ function AdminDashboard() {
       await handleSuspend(id, suspendDays[id]);
       return;
     }
-    if (action === 'clear_suspension') {
+    if (action === 'unsuspend' || action === 'clear_suspension') {
       await handleSuspend(id, null);
       return;
     }
@@ -546,539 +554,565 @@ function AdminDashboard() {
               </div>
             ) : (
               <>
-            {activeTab === 'overview' && summary && (
-              <div className="admin-grid">
-                <div className="admin-card">
-                  <div className="admin-card-icon"><FaUsers /></div>
-                  <div>
-                    <p>Total Users</p>
-                    <h3>{summary.totals.users}</h3>
-                  </div>
-                </div>
-                <div className="admin-card">
-                  <div className="admin-card-icon"><FaUserClock /></div>
-                  <div>
-                    <p>Pending Access</p>
-                    <h3>{summary.totals.pending_access}</h3>
-                  </div>
-                </div>
-                <div className="admin-card">
-                  <div className="admin-card-icon"><FaBoxes /></div>
-                  <div>
-                    <p>Active Listings</p>
-                    <h3>{summary.totals.active_listings}</h3>
-                  </div>
-                </div>
-                <div className="admin-card">
-                  <div className="admin-card-icon"><FaClipboardList /></div>
-                  <div>
-                    <p>Total Orders</p>
-                    <h3>{summary.totals.orders}</h3>
-                  </div>
-                </div>
-                <div className="admin-card">
-                  <div className="admin-card-icon"><FaChartBar /></div>
-                  <div>
-                    <p>Total Bids</p>
-                    <h3>{summary.totals.bids}</h3>
-                  </div>
-                </div>
+                {activeTab === 'overview' && summary && (
+                  <div className="admin-grid">
+                    <div className="admin-card">
+                      <div className="admin-card-icon"><FaUsers /></div>
+                      <div>
+                        <p>Total Users</p>
+                        <h3>{summary.totals.users}</h3>
+                      </div>
+                    </div>
+                    <div className="admin-card">
+                      <div className="admin-card-icon"><FaUserClock /></div>
+                      <div>
+                        <p>Pending Access</p>
+                        <h3>{summary.totals.pending_access}</h3>
+                      </div>
+                    </div>
+                    <div className="admin-card">
+                      <div className="admin-card-icon"><FaBoxes /></div>
+                      <div>
+                        <p>Active Listings</p>
+                        <h3>{summary.totals.active_listings}</h3>
+                      </div>
+                    </div>
+                    <div className="admin-card">
+                      <div className="admin-card-icon"><FaClipboardList /></div>
+                      <div>
+                        <p>Total Orders</p>
+                        <h3>{summary.totals.orders}</h3>
+                      </div>
+                    </div>
+                    <div className="admin-card">
+                      <div className="admin-card-icon"><FaChartBar /></div>
+                      <div>
+                        <p>Total Bids</p>
+                        <h3>{summary.totals.bids}</h3>
+                      </div>
+                    </div>
 
-                <div className="admin-chart">
-                  <div className="admin-chart-header">
-                    <div>
-                      <h3>Signups</h3>
-                      <p>New account creations</p>
-                    </div>
-                    <div className="admin-chart-filters">
-                      <button className={`btn btn-outline ${signupRange === '7d' ? 'active' : ''}`} onClick={() => setSignupRange('7d')}>7 days</button>
-                      <button className={`btn btn-outline ${signupRange === '30d' ? 'active' : ''}`} onClick={() => setSignupRange('30d')}>30 days</button>
-                      <button className={`btn btn-outline ${signupRange === '6m' ? 'active' : ''}`} onClick={() => setSignupRange('6m')}>6 months</button>
-                      <button className={`btn btn-outline ${signupRange === '1y' ? 'active' : ''}`} onClick={() => setSignupRange('1y')}>1 year</button>
+                    <div className="admin-chart">
+                      <div className="admin-chart-header">
+                        <div>
+                          <h3>Signups</h3>
+                          <p>New account creations</p>
+                        </div>
+                        <div className="admin-chart-filters">
+                          <button className={`btn btn-outline ${signupRange === '7d' ? 'active' : ''}`} onClick={() => setSignupRange('7d')}>7 days</button>
+                          <button className={`btn btn-outline ${signupRange === '30d' ? 'active' : ''}`} onClick={() => setSignupRange('30d')}>30 days</button>
+                          <button className={`btn btn-outline ${signupRange === '6m' ? 'active' : ''}`} onClick={() => setSignupRange('6m')}>6 months</button>
+                          <button className={`btn btn-outline ${signupRange === '1y' ? 'active' : ''}`} onClick={() => setSignupRange('1y')}>1 year</button>
+                        </div>
+                      </div>
+                      <div className="admin-chart-line" style={{ height: '320px', width: '100%', marginTop: '24px' }}>
+                        <ResponsiveContainer width="100%" height="100%">
+                          <AreaChart data={chartSeries} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
+                            <defs>
+                              <linearGradient id="colorSignups" x1="0" y1="0" x2="0" y2="1">
+                                <stop offset="5%" stopColor="#059669" stopOpacity={0.4} />
+                                <stop offset="95%" stopColor="#059669" stopOpacity={0} />
+                              </linearGradient>
+                            </defs>
+                            <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#e5e7eb" />
+                            <XAxis
+                              dataKey="label"
+                              stroke="#9ca3af"
+                              fontSize={12}
+                              tickLine={false}
+                              axisLine={false}
+                              dy={10}
+                            />
+                            <YAxis
+                              stroke="#9ca3af"
+                              fontSize={12}
+                              tickLine={false}
+                              axisLine={false}
+                              tickFormatter={(value) => value}
+                            />
+                            <Tooltip
+                              contentStyle={{ borderRadius: '12px', border: 'none', boxShadow: '0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1)' }}
+                              cursor={{ stroke: '#059669', strokeWidth: 1, strokeDasharray: '4 4' }}
+                              labelStyle={{ color: '#111827', fontWeight: 'bold', marginBottom: '4px' }}
+                              itemStyle={{ color: '#059669', fontWeight: '600' }}
+                            />
+                            <Area
+                              type="monotone"
+                              dataKey="count"
+                              name="Signups"
+                              stroke="#059669"
+                              strokeWidth={4}
+                              fillOpacity={1}
+                              fill="url(#colorSignups)"
+                              animationDuration={1500}
+                              activeDot={{ r: 6, strokeWidth: 0, fill: '#059669' }}
+                            />
+                          </AreaChart>
+                        </ResponsiveContainer>
+                      </div>
                     </div>
                   </div>
-                    <div className="admin-chart-line">
-                      <svg viewBox="0 0 600 180" preserveAspectRatio="none">
-                        <polyline
-                          fill="none"
-                          stroke="url(#adminLine)"
-                          strokeWidth="3"
-                          points={chartPoints.points}
+                )}
+
+                {activeTab === 'users' && (
+                  <div className="admin-section">
+                    <div className="admin-section-header">
+                      <h2>Users</h2>
+                      <div style={{ display: 'flex', gap: 8 }}>
+                        <input
+                          className="input"
+                          placeholder="Search name or email"
+                          value={userSearch}
+                          onChange={(e) => setUserSearch(e.target.value)}
                         />
-                        {chartPoints.coords.map((pt, idx) => (
-                          <g key={`pt-${idx}`}>
-                            <circle cx={pt.x} cy={pt.y} r="4" fill="var(--color-primary)" />
-                            <text
-                              x={pt.x}
-                              y={Math.max(pt.y - 8, 10)}
-                              textAnchor="middle"
-                              fontSize="10"
-                              fill="var(--color-gray-700)"
+                        <button className="btn btn-primary" onClick={loadUsers}>Search</button>
+                      </div>
+                    </div>
+                    <div className="admin-table">
+                      <div className="admin-table-row admin-table-head admin-table-users">
+                        <span>User</span>
+                        <span>Role & Joined</span>
+                        <span>Stats</span>
+                        <span>Status</span>
+                        <span>Actions</span>
+                      </div>
+                      {users.map((u) => (
+                        <div key={u.id} className="admin-table-row admin-table-users">
+                          <div className="admin-cell" data-label="User">
+                            <strong>{u.name}</strong>
+                            <p>{u.oau_email}</p>
+                            <p style={{ fontSize: '0.75rem', color: 'var(--color-gray-500)', marginTop: '2px', fontFamily: 'monospace' }}>
+                              ID: {u.id}
+                            </p>
+                          </div>
+
+                          <div className="admin-cell" data-label="Role & Joined">
+                            {isSuperAdmin ? (
+                              <select
+                                className="input"
+                                value={u.role}
+                                onChange={(e) => handleRoleChange(u.id, e.target.value)}
+                                disabled={actioning[u.id]}
+                                style={{ padding: '4px 8px', fontSize: '0.85rem' }}
+                              >
+                                <option value="user">User</option>
+                                <option value="admin">Admin</option>
+                                <option value="super_admin">Super Admin</option>
+                              </select>
+                            ) : (
+                              <span style={{ textTransform: 'capitalize', fontWeight: '600' }}>{u.role.replace('_', ' ')}</span>
+                            )}
+                            <p style={{ fontSize: '0.75rem', color: 'var(--color-gray-400)', marginTop: '4px' }}>
+                              Joined {formatDate(u.created_at)}
+                            </p>
+                          </div>
+
+                          <div className="admin-cell" data-label="Stats">
+                            <span style={{ fontWeight: '600', color: 'var(--color-gray-700)' }}>{u.order_count ?? 0} Orders</span>
+                            <p style={{ fontSize: '0.8rem', color: 'var(--color-gray-500)' }}>{u.product_count ?? 0} Listings</p>
+                          </div>
+
+                          <div className="admin-cell" data-label="Status">
+                            {(() => {
+                              const statusInfo = getUserStatus(u);
+                              return (
+                                <span className={`admin-pill ${statusInfo.tone}`}>
+                                  {statusInfo.label}
+                                </span>
+                              );
+                            })()}
+                          </div>
+
+                          <div className="admin-cell admin-actions" data-label="Actions">
+                            <select
+                              className="input"
+                              value={userAction[u.id] || ''}
+                              onChange={(e) => setUserAction((prev) => ({ ...prev, [u.id]: e.target.value }))}
                             >
-                              {pt.count}
-                            </text>
-                          </g>
-                        ))}
-                        <defs>
-                          <linearGradient id="adminLine" x1="0" y1="0" x2="1" y2="0">
-                            <stop offset="0%" stopColor="var(--color-primary)" />
-                            <stop offset="100%" stopColor="var(--color-accent)" />
-                          </linearGradient>
-                        </defs>
-                      </svg>
-                      <div className="admin-chart-labels">
-                        {chartSeries.map((d) => (
-                          <span key={d.date}>{d.label}</span>
-                        ))}
-                      </div>
+                              <option value="">Select action</option>
+                              {!u.is_verified && u.access_status === 'approved' && (
+                                <option value="verify">Verify seller</option>
+                              )}
+                              {u.is_verified && (
+                                <option value="unverify">Remove verification</option>
+                              )}
+                              <option value={u.is_blocked ? 'unblock' : 'block'}>{u.is_blocked ? 'Unblock user' : 'Block user'}</option>
+                              <option value="suspend">Suspend user</option>
+                              {isUserSuspended(u) && <option value="unsuspend">Unsuspend user</option>}
+                            </select>
+                            {userAction[u.id] === 'suspend' && (
+                              <select
+                                className="input"
+                                value={suspendDays[u.id] || ''}
+                                onChange={(e) => setSuspendDays((prev) => ({ ...prev, [u.id]: e.target.value }))}
+                              >
+                                <option value="">Select duration</option>
+                                <option value="1">1 day</option>
+                                <option value="3">3 days</option>
+                                <option value="7">7 days</option>
+                                <option value="14">14 days</option>
+                                <option value="30">30 days</option>
+                              </select>
+                            )}
+                            <button
+                              className="btn btn-outline"
+                              onClick={() => handleUserAction(u.id)}
+                              disabled={actioning[u.id] || !userAction[u.id] || (userAction[u.id] === 'suspend' && !suspendDays[u.id])}
+                            >
+                              Apply
+                            </button>
+                          </div>
+                        </div>
+                      ))}
                     </div>
-                </div>
-              </div>
-            )}
+                  </div>
+                )}
 
-            {activeTab === 'users' && (
-              <div className="admin-section">
-                <div className="admin-section-header">
-                  <h2>Users</h2>
-                  <div style={{ display: 'flex', gap: 8 }}>
-                    <input
-                      className="input"
-                      placeholder="Search name or email"
-                      value={userSearch}
-                      onChange={(e) => setUserSearch(e.target.value)}
-                    />
-                    <button className="btn btn-primary" onClick={loadUsers}>Search</button>
-                  </div>
-                </div>
-                <div className="admin-table">
-                  <div className="admin-table-row admin-table-head">
-                    <span>User</span>
-                    <span>Status</span>
-                    <span>Role</span>
-                    <span>Actions</span>
-                  </div>
-                  {users.map((u) => (
-                    <div key={u.id} className="admin-table-row">
-                      <div className="admin-cell" data-label="User">
-                        <strong>{u.name}</strong>
-                        <p>{u.oau_email}</p>
+                {activeTab === 'access' && (
+                  <div className="admin-section">
+                    <div className="admin-section-header">
+                      <h2>Access Requests</h2>
+                    </div>
+                    <div className="admin-table">
+                      <div className="admin-table-row admin-table-head">
+                        <span>User</span>
+                        <span>Department</span>
+                        <span>Actions</span>
                       </div>
-                      <div className="admin-cell" data-label="Status">
-                        {(() => {
-                          const statusInfo = getUserStatus(u);
-                          return (
-                            <span className={`admin-pill ${statusInfo.tone}`}>
-                              {statusInfo.label}
+                      {accessRequests.map((u) => (
+                        <div key={u.id} className="admin-table-row">
+                          <div className="admin-cell" data-label="User">
+                            <strong>{u.name}</strong>
+                            <p>{u.oau_email}</p>
+                          </div>
+                          <div className="admin-cell" data-label="Department">
+                            <span>{u.department}</span>
+                          </div>
+                          <div className="admin-cell admin-actions" data-label="Actions">
+                            <select
+                              className="input"
+                              value={accessAction[u.id] || ''}
+                              onChange={(e) => setAccessAction((prev) => ({ ...prev, [u.id]: e.target.value }))}
+                              disabled={actioning[u.id]}
+                            >
+                              <option value="">Select action</option>
+                              <option value="approve">Approve access</option>
+                            </select>
+                            <button
+                              className="btn btn-outline"
+                              onClick={() => handleAccessAction(u.id)}
+                              disabled={actioning[u.id] || !accessAction[u.id]}
+                            >
+                              {actioning[u.id] ? <><FaSpinner className="spinner" /> Applying...</> : 'Apply'}
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {activeTab === 'verification' && (
+                  <div className="admin-section">
+                    <div className="admin-section-header">
+                      <h2>Verification Requests</h2>
+                    </div>
+                    <div className="admin-table">
+                      <div className="admin-table-row admin-table-4 admin-table-head">
+                        <span>User</span>
+                        <span>Reason</span>
+                        <span>Proof</span>
+                        <span>Actions</span>
+                      </div>
+                      {verificationRequests.map((req) => (
+                        <div key={req.id} className="admin-table-row admin-table-4">
+                          <div className="admin-cell" data-label="User">
+                            <strong>{req.user?.name || 'User'}</strong>
+                            <p>{req.user?.oau_email}</p>
+                          </div>
+                          <div className="admin-cell" data-label="Reason">
+                            <p>{req.reason}</p>
+                          </div>
+                          <div className="admin-cell" data-label="Proof">
+                            {req.proof_url ? (
+                              <a href={req.proof_url} target="_blank" rel="noreferrer">View proof</a>
+                            ) : (
+                              <span className="admin-pill">No proof</span>
+                            )}
+                          </div>
+                          <div className="admin-cell admin-actions" data-label="Actions">
+                            <button
+                              className="btn btn-outline"
+                              onClick={() => handleVerify(req.user?.id)}
+                              disabled={actioning[req.user?.id]}
+                            >
+                              Verify Seller
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {activeTab === 'listings' && (
+                  <div className="admin-section">
+                    <div className="admin-section-header">
+                      <h2>Listings</h2>
+                    </div>
+                    <div className="admin-table">
+                      <div className="admin-table-row admin-table-head">
+                        <span>Listing</span>
+                        <span>Status</span>
+                        <span>Seller</span>
+                        <span>Actions</span>
+                      </div>
+                      {products.map((p) => (
+                        <div key={p.id} className="admin-table-row">
+                          <div className="admin-cell" data-label="Listing">
+                            <strong>{p.title}</strong>
+                            <p>{p.categories?.name || 'General'} · ₦{Number(p.price).toLocaleString()}</p>
+                          </div>
+                          <div className="admin-cell" data-label="Status">
+                            <span className={`admin-pill ${p.status === 'available' ? 'success' : 'warning'}`}>
+                              {p.status}
                             </span>
-                          );
-                        })()}
+                          </div>
+                          <div className="admin-cell" data-label="Seller">
+                            <strong>{p.users?.store_name || p.users?.name || 'Seller'}</strong>
+                            <p>{p.users?.oau_email}</p>
+                          </div>
+                          <div className="admin-cell admin-actions" data-label="Actions">
+                            <select
+                              className="input"
+                              value={productAction[p.id] || ''}
+                              onChange={(e) => setProductAction((prev) => ({ ...prev, [p.id]: e.target.value }))}
+                            >
+                              <option value="">Select action</option>
+                              <option value="toggle_status">Mark {p.status === 'available' ? 'Sold' : 'Available'}</option>
+                              <option value="delete">Delete listing</option>
+                            </select>
+                            <button
+                              className="btn btn-outline"
+                              onClick={() => handleProductAction(p.id, p.status)}
+                              disabled={actioning[p.id] || !productAction[p.id]}
+                            >
+                              Apply
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {activeTab === 'orders' && (
+                  <div className="admin-section">
+                    <div className="admin-section-header">
+                      <h2>Orders</h2>
+                    </div>
+                    <div className="admin-table">
+                      <div className="admin-table-row admin-table-head">
+                        <span>Order</span>
+                        <span>Status</span>
+                        <span>Buyer</span>
+                        <span>Seller</span>
                       </div>
-                      <div className="admin-cell" data-label="Role">
-                        {isSuperAdmin ? (
-                          <select
+                      {orders.map((o) => (
+                        <div key={o.id} className="admin-table-row">
+                          <div className="admin-cell" data-label="Order">
+                            <strong>{o.products?.title || 'Order'}</strong>
+                            <p>₦{Number(o.amount).toLocaleString()}</p>
+                          </div>
+                          <div className="admin-cell" data-label="Status">
+                            <span className="admin-pill">{o.status}</span>
+                          </div>
+                          <div className="admin-cell" data-label="Buyer">
+                            <strong>{o.buyer?.name || 'Buyer'}</strong>
+                            <p>{o.buyer?.oau_email}</p>
+                          </div>
+                          <div className="admin-cell" data-label="Seller">
+                            <strong>{o.seller?.name || 'Seller'}</strong>
+                            <p>{o.seller?.oau_email}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {activeTab === 'promotions' && (
+                  <div className="admin-section">
+                    <div className="admin-section-header">
+                      <h2>Send Promotions</h2>
+                    </div>
+                    <form onSubmit={handleSendPromo} className="admin-form">
+                      <div className="input-group">
+                        <label>Title</label>
+                        <input
+                          className="input"
+                          value={promo.title}
+                          onChange={(e) => setPromo((prev) => ({ ...prev, title: e.target.value }))}
+                          required
+                        />
+                      </div>
+                      <div className="input-group">
+                        <label>Message</label>
+                        <textarea
+                          className="input"
+                          rows={4}
+                          value={promo.message}
+                          onChange={(e) => setPromo((prev) => ({ ...prev, message: e.target.value }))}
+                          required
+                        />
+                      </div>
+                      <div className="input-group">
+                        <label>Audience</label>
+                        <select
+                          className="input"
+                          value={promo.audience}
+                          onChange={(e) => setPromo((prev) => ({ ...prev, audience: e.target.value }))}
+                        >
+                          <option value="all">All approved users</option>
+                          <option value="unverified">Unverified users</option>
+                          <option value="pending">Pending access requests</option>
+                          <option value="selected">Selected user IDs</option>
+                        </select>
+                      </div>
+                      {promo.audience === 'selected' && (
+                        <div className="input-group">
+                          <label>User IDs (comma-separated)</label>
+                          <input
                             className="input"
-                            value={u.role}
-                            onChange={(e) => handleRoleChange(u.id, e.target.value)}
-                            disabled={actioning[u.id]}
-                          >
-                            <option value="user">user</option>
-                            <option value="admin">admin</option>
-                            <option value="super_admin">super_admin</option>
-                          </select>
+                            value={promo.userIds}
+                            onChange={(e) => setPromo((prev) => ({ ...prev, userIds: e.target.value }))}
+                          />
+                        </div>
+                      )}
+                      <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                        <input
+                          type="checkbox"
+                          checked={promo.sendEmail}
+                          onChange={(e) => setPromo((prev) => ({ ...prev, sendEmail: e.target.checked }))}
+                        />
+                        Send email in addition to in-app notification
+                      </label>
+                      <button className="btn btn-primary" type="submit" disabled={promoSending}>
+                        {promoSending ? <><FaSpinner className="spinner" /> Sending...</> : <><FaBullhorn /> Send Promotion</>}
+                      </button>
+                      {promoResult && <p style={{ color: 'var(--color-gray-600)' }}>{promoResult}</p>}
+                    </form>
+                  </div>
+                )}
+
+                {activeTab === 'logs' && (
+                  <div className="admin-section">
+                    <div className="admin-section-header">
+                      <h2>Activity Log</h2>
+                    </div>
+                    <div className="admin-table">
+                      <div className="admin-table-row admin-table-head">
+                        <span>Action</span>
+                        <span>Actor</span>
+                        <span>Time</span>
+                      </div>
+                      {logs.map((log) => (
+                        <div key={log.id} className="admin-table-row">
+                          <div className="admin-cell" data-label="Action">
+                            <strong>{log.action}</strong>
+                            <p>{log.entity_type} · {log.entity_id || '—'}</p>
+                          </div>
+                          <div className="admin-cell" data-label="Actor">
+                            <strong>{log.actor?.name || 'System'}</strong>
+                            <p>{log.actor?.oau_email || ''}</p>
+                          </div>
+                          <div className="admin-cell" data-label="Time">
+                            <span>{new Date(log.created_at).toLocaleString()}</span>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                {activeTab === 'messages' && (
+                  <div className="admin-section">
+                    <div className="admin-section-header">
+                      <h2>Messages</h2>
+                    </div>
+                    <div className="admin-chat-grid">
+                      <div className="admin-chat-list">
+                        {adminConversations.length === 0 ? (
+                          <div className="admin-empty">No conversations yet.</div>
                         ) : (
-                          <span>{u.role}</span>
+                          adminConversations.map((conv) => {
+                            const buyerName = conv.buyer?.name || 'Buyer';
+                            const sellerName = conv.seller?.name || 'Seller';
+                            const isActive = activeAdminConv?.id === conv.id;
+                            return (
+                              <button
+                                key={conv.id}
+                                type="button"
+                                className={`admin-chat-item ${isActive ? 'active' : ''}`}
+                                onClick={() => openAdminConversation(conv)}
+                              >
+                                <div className="admin-chat-item-title">
+                                  {buyerName} ? {sellerName}
+                                </div>
+                                <div className="admin-chat-item-sub">
+                                  {conv.product?.title || 'Conversation'}
+                                </div>
+                                <div className="admin-chat-item-preview">
+                                  {conv.lastMessage?.content || (conv.lastMessage?.image_url ? '?? Image' : 'No messages yet')}
+                                </div>
+                                <div className="admin-chat-item-time">
+                                  {new Date(conv.updated_at).toLocaleString()}
+                                </div>
+                              </button>
+                            );
+                          })
                         )}
                       </div>
-                      <div className="admin-cell admin-actions" data-label="Actions">
-                        <select
-                          className="input"
-                          value={userAction[u.id] || ''}
-                          onChange={(e) => setUserAction((prev) => ({ ...prev, [u.id]: e.target.value }))}
-                        >
-                          <option value="">Select action</option>
-                          {!u.is_verified && u.access_status === 'approved' && (
-                            <option value="verify">Verify seller</option>
-                          )}
-                          {u.is_verified && (
-                            <option value="unverify">Remove verification</option>
-                          )}
-                          <option value={u.is_blocked ? 'unblock' : 'block'}>{u.is_blocked ? 'Unblock user' : 'Block user'}</option>
-                          <option value="suspend">Suspend user</option>
-                          {isUserSuspended(u) && <option value="clear_suspension">Clear suspension</option>}
-                        </select>
-                        {userAction[u.id] === 'suspend' && (
-                          <select
-                            className="input"
-                            value={suspendDays[u.id] || ''}
-                            onChange={(e) => setSuspendDays((prev) => ({ ...prev, [u.id]: e.target.value }))}
-                          >
-                            <option value="">Select duration</option>
-                            <option value="1">1 day</option>
-                            <option value="3">3 days</option>
-                            <option value="7">7 days</option>
-                            <option value="14">14 days</option>
-                            <option value="30">30 days</option>
-                          </select>
-                        )}
-                        <button
-                          className="btn btn-outline"
-                          onClick={() => handleUserAction(u.id)}
-                          disabled={actioning[u.id] || !userAction[u.id] || (userAction[u.id] === 'suspend' && !suspendDays[u.id])}
-                        >
-                          Apply
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
 
-            {activeTab === 'access' && (
-              <div className="admin-section">
-                <div className="admin-section-header">
-                  <h2>Access Requests</h2>
-                </div>
-                <div className="admin-table">
-                  <div className="admin-table-row admin-table-head">
-                    <span>User</span>
-                    <span>Department</span>
-                    <span>Actions</span>
-                  </div>
-                  {accessRequests.map((u) => (
-                    <div key={u.id} className="admin-table-row">
-                      <div className="admin-cell" data-label="User">
-                        <strong>{u.name}</strong>
-                        <p>{u.oau_email}</p>
-                      </div>
-                      <div className="admin-cell" data-label="Department">
-                        <span>{u.department}</span>
-                      </div>
-                      <div className="admin-cell admin-actions" data-label="Actions">
-                        <select
-                          className="input"
-                          value={accessAction[u.id] || ''}
-                          onChange={(e) => setAccessAction((prev) => ({ ...prev, [u.id]: e.target.value }))}
-                          disabled={actioning[u.id]}
-                        >
-                          <option value="">Select action</option>
-                          <option value="approve">Approve access</option>
-                        </select>
-                        <button
-                          className="btn btn-outline"
-                          onClick={() => handleAccessAction(u.id)}
-                          disabled={actioning[u.id] || !accessAction[u.id]}
-                        >
-                          {actioning[u.id] ? <><FaSpinner className="spinner" /> Applying...</> : 'Apply'}
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {activeTab === 'verification' && (
-              <div className="admin-section">
-                <div className="admin-section-header">
-                  <h2>Verification Requests</h2>
-                </div>
-                <div className="admin-table">
-                  <div className="admin-table-row admin-table-4 admin-table-head">
-                    <span>User</span>
-                    <span>Reason</span>
-                    <span>Proof</span>
-                    <span>Actions</span>
-                  </div>
-                  {verificationRequests.map((req) => (
-                    <div key={req.id} className="admin-table-row admin-table-4">
-                      <div className="admin-cell" data-label="User">
-                        <strong>{req.user?.name || 'User'}</strong>
-                        <p>{req.user?.oau_email}</p>
-                      </div>
-                      <div className="admin-cell" data-label="Reason">
-                        <p>{req.reason}</p>
-                      </div>
-                      <div className="admin-cell" data-label="Proof">
-                        {req.proof_url ? (
-                          <a href={req.proof_url} target="_blank" rel="noreferrer">View proof</a>
+                      <div className="admin-chat-thread">
+                        {!activeAdminConv ? (
+                          <div className="admin-empty">Select a conversation to view messages.</div>
                         ) : (
-                          <span className="admin-pill">No proof</span>
+                          <>
+                            <div className="admin-chat-thread-header">
+                              <div>
+                                <strong>{activeAdminConv.buyer?.name || 'Buyer'} ? {activeAdminConv.seller?.name || 'Seller'}</strong>
+                                <div className="admin-chat-thread-sub">
+                                  {activeAdminConv.product?.title || 'Conversation'}
+                                </div>
+                              </div>
+                            </div>
+                            <div className="admin-chat-messages">
+                              {adminChatLoading ? (
+                                <div className="admin-empty">Loading messages...</div>
+                              ) : adminConvMessages.length === 0 ? (
+                                <div className="admin-empty">No messages yet.</div>
+                              ) : (
+                                adminConvMessages.map((msg) => (
+                                  <div key={msg.id} className="admin-chat-message">
+                                    <div className="admin-chat-message-header">
+                                      <strong>{msg.sender?.name || 'User'}</strong>
+                                      <span>{new Date(msg.created_at).toLocaleString()}</span>
+                                    </div>
+                                    {msg.image_url && (
+                                      <img src={msg.image_url} alt="attachment" className="admin-chat-image" />
+                                    )}
+                                    {msg.content && <p>{msg.content}</p>}
+                                  </div>
+                                ))
+                              )}
+                            </div>
+                          </>
                         )}
                       </div>
-                      <div className="admin-cell admin-actions" data-label="Actions">
-                        <button
-                          className="btn btn-outline"
-                          onClick={() => handleVerify(req.user?.id)}
-                          disabled={actioning[req.user?.id]}
-                        >
-                          Verify Seller
-                        </button>
-                      </div>
                     </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {activeTab === 'listings' && (
-              <div className="admin-section">
-                <div className="admin-section-header">
-                  <h2>Listings</h2>
-                </div>
-                <div className="admin-table">
-                  <div className="admin-table-row admin-table-head">
-                    <span>Listing</span>
-                    <span>Status</span>
-                    <span>Seller</span>
-                    <span>Actions</span>
                   </div>
-                  {products.map((p) => (
-                    <div key={p.id} className="admin-table-row">
-                      <div className="admin-cell" data-label="Listing">
-                        <strong>{p.title}</strong>
-                        <p>{p.categories?.name || 'General'} · ₦{Number(p.price).toLocaleString()}</p>
-                      </div>
-                      <div className="admin-cell" data-label="Status">
-                        <span className={`admin-pill ${p.status === 'available' ? 'success' : 'warning'}`}>
-                          {p.status}
-                        </span>
-                      </div>
-                      <div className="admin-cell" data-label="Seller">
-                        <strong>{p.users?.store_name || p.users?.name || 'Seller'}</strong>
-                        <p>{p.users?.oau_email}</p>
-                      </div>
-                      <div className="admin-cell admin-actions" data-label="Actions">
-                        <select
-                          className="input"
-                          value={productAction[p.id] || ''}
-                          onChange={(e) => setProductAction((prev) => ({ ...prev, [p.id]: e.target.value }))}
-                        >
-                          <option value="">Select action</option>
-                          <option value="toggle_status">Mark {p.status === 'available' ? 'Sold' : 'Available'}</option>
-                          <option value="delete">Delete listing</option>
-                        </select>
-                        <button
-                          className="btn btn-outline"
-                          onClick={() => handleProductAction(p.id, p.status)}
-                          disabled={actioning[p.id] || !productAction[p.id]}
-                        >
-                          Apply
-                        </button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {activeTab === 'orders' && (
-              <div className="admin-section">
-                <div className="admin-section-header">
-                  <h2>Orders</h2>
-                </div>
-                <div className="admin-table">
-                  <div className="admin-table-row admin-table-head">
-                    <span>Order</span>
-                    <span>Status</span>
-                    <span>Buyer</span>
-                    <span>Seller</span>
-                  </div>
-                  {orders.map((o) => (
-                    <div key={o.id} className="admin-table-row">
-                      <div className="admin-cell" data-label="Order">
-                        <strong>{o.products?.title || 'Order'}</strong>
-                        <p>₦{Number(o.amount).toLocaleString()}</p>
-                      </div>
-                      <div className="admin-cell" data-label="Status">
-                        <span className="admin-pill">{o.status}</span>
-                      </div>
-                      <div className="admin-cell" data-label="Buyer">
-                        <strong>{o.buyer?.name || 'Buyer'}</strong>
-                        <p>{o.buyer?.oau_email}</p>
-                      </div>
-                      <div className="admin-cell" data-label="Seller">
-                        <strong>{o.seller?.name || 'Seller'}</strong>
-                        <p>{o.seller?.oau_email}</p>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {activeTab === 'promotions' && (
-              <div className="admin-section">
-                <div className="admin-section-header">
-                  <h2>Send Promotions</h2>
-                </div>
-                <form onSubmit={handleSendPromo} className="admin-form">
-                  <div className="input-group">
-                    <label>Title</label>
-                    <input
-                      className="input"
-                      value={promo.title}
-                      onChange={(e) => setPromo((prev) => ({ ...prev, title: e.target.value }))}
-                      required
-                    />
-                  </div>
-                  <div className="input-group">
-                    <label>Message</label>
-                    <textarea
-                      className="input"
-                      rows={4}
-                      value={promo.message}
-                      onChange={(e) => setPromo((prev) => ({ ...prev, message: e.target.value }))}
-                      required
-                    />
-                  </div>
-                  <div className="input-group">
-                    <label>Audience</label>
-                    <select
-                      className="input"
-                      value={promo.audience}
-                      onChange={(e) => setPromo((prev) => ({ ...prev, audience: e.target.value }))}
-                    >
-                      <option value="all">All approved users</option>
-                      <option value="unverified">Unverified users</option>
-                      <option value="pending">Pending access requests</option>
-                      <option value="selected">Selected user IDs</option>
-                    </select>
-                  </div>
-                  {promo.audience === 'selected' && (
-                    <div className="input-group">
-                      <label>User IDs (comma-separated)</label>
-                      <input
-                        className="input"
-                        value={promo.userIds}
-                        onChange={(e) => setPromo((prev) => ({ ...prev, userIds: e.target.value }))}
-                      />
-                    </div>
-                  )}
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                    <input
-                      type="checkbox"
-                      checked={promo.sendEmail}
-                      onChange={(e) => setPromo((prev) => ({ ...prev, sendEmail: e.target.checked }))}
-                    />
-                    Send email in addition to in-app notification
-                  </label>
-                  <button className="btn btn-primary" type="submit" disabled={promoSending}>
-                    {promoSending ? <><FaSpinner className="spinner" /> Sending...</> : <><FaBullhorn /> Send Promotion</>}
-                  </button>
-                  {promoResult && <p style={{ color: 'var(--color-gray-600)' }}>{promoResult}</p>}
-                </form>
-              </div>
-            )}
-
-            {activeTab === 'logs' && (
-              <div className="admin-section">
-                <div className="admin-section-header">
-                  <h2>Activity Log</h2>
-                </div>
-                <div className="admin-table">
-                  <div className="admin-table-row admin-table-head">
-                    <span>Action</span>
-                    <span>Actor</span>
-                    <span>Time</span>
-                  </div>
-                  {logs.map((log) => (
-                    <div key={log.id} className="admin-table-row">
-                      <div className="admin-cell" data-label="Action">
-                        <strong>{log.action}</strong>
-                        <p>{log.entity_type} · {log.entity_id || '—'}</p>
-                      </div>
-                      <div className="admin-cell" data-label="Actor">
-                        <strong>{log.actor?.name || 'System'}</strong>
-                        <p>{log.actor?.oau_email || ''}</p>
-                      </div>
-                      <div className="admin-cell" data-label="Time">
-                        <span>{new Date(log.created_at).toLocaleString()}</span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )}
-
-            {activeTab === 'messages' && (
-  <div className="admin-section">
-    <div className="admin-section-header">
-      <h2>Messages</h2>
-    </div>
-    <div className="admin-chat-grid">
-      <div className="admin-chat-list">
-        {adminConversations.length === 0 ? (
-          <div className="admin-empty">No conversations yet.</div>
-        ) : (
-          adminConversations.map((conv) => {
-            const buyerName = conv.buyer?.name || 'Buyer';
-            const sellerName = conv.seller?.name || 'Seller';
-            const isActive = activeAdminConv?.id === conv.id;
-            return (
-              <button
-                key={conv.id}
-                type="button"
-                className={`admin-chat-item ${isActive ? 'active' : ''}`}
-                onClick={() => openAdminConversation(conv)}
-              >
-                <div className="admin-chat-item-title">
-                  {buyerName} ? {sellerName}
-                </div>
-                <div className="admin-chat-item-sub">
-                  {conv.product?.title || 'Conversation'}
-                </div>
-                <div className="admin-chat-item-preview">
-                  {conv.lastMessage?.content || (conv.lastMessage?.image_url ? '?? Image' : 'No messages yet')}
-                </div>
-                <div className="admin-chat-item-time">
-                  {new Date(conv.updated_at).toLocaleString()}
-                </div>
-              </button>
-            );
-          })
-        )}
-      </div>
-
-      <div className="admin-chat-thread">
-        {!activeAdminConv ? (
-          <div className="admin-empty">Select a conversation to view messages.</div>
-        ) : (
-          <>
-            <div className="admin-chat-thread-header">
-              <div>
-                <strong>{activeAdminConv.buyer?.name || 'Buyer'} ? {activeAdminConv.seller?.name || 'Seller'}</strong>
-                <div className="admin-chat-thread-sub">
-                  {activeAdminConv.product?.title || 'Conversation'}
-                </div>
-              </div>
-            </div>
-            <div className="admin-chat-messages">
-              {adminChatLoading ? (
-                <div className="admin-empty">Loading messages...</div>
-              ) : adminConvMessages.length === 0 ? (
-                <div className="admin-empty">No messages yet.</div>
-              ) : (
-                adminConvMessages.map((msg) => (
-                  <div key={msg.id} className="admin-chat-message">
-                    <div className="admin-chat-message-header">
-                      <strong>{msg.sender?.name || 'User'}</strong>
-                      <span>{new Date(msg.created_at).toLocaleString()}</span>
-                    </div>
-                    {msg.image_url && (
-                      <img src={msg.image_url} alt="attachment" className="admin-chat-image" />
-                    )}
-                    {msg.content && <p>{msg.content}</p>}
-                  </div>
-                ))
-              )}
-            </div>
-          </>
-        )}
-      </div>
-    </div>
-  </div>
-)}              </>
+                )}              </>
             )}
           </div>
         </div>
@@ -1088,8 +1122,6 @@ function AdminDashboard() {
 }
 
 export default AdminDashboard;
-
-
 
 
 
