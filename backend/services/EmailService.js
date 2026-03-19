@@ -13,8 +13,9 @@ class EmailService {
         pass: process.env.SMTP_PASS,
       },
       tls: {
-        rejectUnauthorized: false, // helps on some cloud platforms
+        rejectUnauthorized: false,
       },
+      family: 4, // Force IPv4 — Render's IPv6 cannot reach Gmail SMTP
     });
 
     this.from = process.env.SMTP_FROM || `"UniTrade OAU" <${process.env.SMTP_USER}>`;
