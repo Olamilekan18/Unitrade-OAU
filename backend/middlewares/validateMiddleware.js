@@ -27,8 +27,41 @@ const productValidation = [
   body('price').isFloat({ min: 0 }).withMessage('Price must be a positive number'),
   body('description').optional({ checkFalsy: true }).trim().isLength({ max: 2000 }).withMessage('Description is too long'),
   body('category_id').isInt({ min: 1 }).withMessage('Valid category is required'),
-  body('image_url').trim().notEmpty().withMessage('Image URL is required').isURL().withMessage('Must be a valid URL'),
+  body('image_url').optional({ checkFalsy: true }).isURL().withMessage('Must be a valid URL'),
+  body('image_urls').optional({ checkFalsy: true }).isArray({ min: 1, max: 3 }).withMessage('You can upload up to 3 images'),
+  body('image_urls.*').optional({ checkFalsy: true }).isURL().withMessage('Must be a valid URL'),
+  body().custom((_, { req }) => {
+    const urls = req.body.image_urls;
+    const singleUrl = req.body.image_url;
+    if ((!Array.isArray(urls) || urls.length === 0) && !singleUrl) {
+      throw new Error('At least one product image is required');
+    }
+    return true;
+  }),
   body('quantity').optional({ checkFalsy: true }).isInt({ min: 1 }).withMessage('Quantity must be at least 1'),
+  validateRequest
+];
+
+const productUpdateValidation = [
+  body('title').optional({ checkFalsy: true }).trim().isLength({ max: 200 }).withMessage('Title is too long'),
+  body('price').optional({ checkFalsy: true }).isFloat({ min: 0 }).withMessage('Price must be a positive number'),
+  body('description').optional({ checkFalsy: true }).trim().isLength({ max: 2000 }).withMessage('Description is too long'),
+  body('category_id').optional({ checkFalsy: true }).isInt({ min: 1 }).withMessage('Valid category is required'),
+  body('image_url').optional({ checkFalsy: true }).isURL().withMessage('Must be a valid URL'),
+  body('image_urls').optional({ checkFalsy: true }).isArray({ min: 1, max: 3 }).withMessage('You can upload up to 3 images'),
+  body('image_urls.*').optional({ checkFalsy: true }).isURL().withMessage('Must be a valid URL'),
+  body('quantity').optional({ checkFalsy: true }).isInt({ min: 1 }).withMessage('Quantity must be at least 1'),
+  body().custom((_, { req }) => {
+    const fields = ['title', 'price', 'description', 'category_id', 'image_url', 'image_urls', 'quantity'];
+    const hasAny = fields.some((field) => req.body[field] !== undefined);
+    if (!hasAny) {
+      throw new Error('Provide at least one field to update');
+    }
+    if (Array.isArray(req.body.image_urls) && req.body.image_urls.length > 3) {
+      throw new Error('You can upload up to 3 images');
+    }
+    return true;
+  }),
   validateRequest
 ];
 
@@ -42,5 +75,6 @@ module.exports = {
   registerValidation,
   loginValidation,
   productValidation,
+  productUpdateValidation,
   reviewValidation
 };

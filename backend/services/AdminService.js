@@ -50,7 +50,7 @@ class AdminService {
   async listUsers({ search, role, access_status }) {
     let query = this.supabase
       .from('users')
-      .select('id, name, oau_email, department, access_status, is_verified, role, is_blocked, suspended_until, created_at')
+      .select('id, name, oau_email, department, access_status, is_verified, role, is_blocked, suspended_until, created_at, last_login')
       .order('created_at', { ascending: false });
 
     if (role) query = query.eq('role', role);

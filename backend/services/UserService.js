@@ -76,8 +76,16 @@ class UserService {
       throw err;
     }
 
-    if (data.auth_failures > 0) {
-      await this.supabase.from('users').update({ auth_failures: 0, suspended_until: null }).eq('id', data.id);
+    if (data.auth_failures > 0 || !data.last_login) {
+      await this.supabase.from('users').update({
+        auth_failures: 0,
+        suspended_until: null,
+        last_login: new Date().toISOString()
+      }).eq('id', data.id);
+    } else {
+      await this.supabase.from('users').update({
+        last_login: new Date().toISOString()
+      }).eq('id', data.id);
     }
 
     // Don't send password_hash to the client
