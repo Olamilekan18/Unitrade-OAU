@@ -33,6 +33,7 @@ create table if not exists public.products (
   category_id bigint not null references public.categories(id) on update cascade on delete restrict,
   seller_id uuid not null references public.users(id) on update cascade on delete restrict,
   image_url text not null,
+  image_urls text[] not null default '{}'::text[],
   status text not null default 'available' check (status in ('available', 'sold')),
   created_at timestamptz not null default now()
 );
