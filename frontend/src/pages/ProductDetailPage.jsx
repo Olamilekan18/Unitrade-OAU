@@ -36,6 +36,7 @@ function ProductDetailPage() {
     const [hasBid, setHasBid] = useState(false);
     const [myBid, setMyBid] = useState(null);
     const [editingBid, setEditingBid] = useState(false);
+    const [activeImage, setActiveImage] = useState('');
 
     // Buy state
     const [buying, setBuying] = useState(false);
@@ -68,6 +69,16 @@ function ProductDetailPage() {
         }
         loadData();
     }, [id]);
+
+    useEffect(() => {
+        if (!product) return;
+        const images = product.image_urls?.length
+            ? product.image_urls
+            : product.image_url
+                ? [product.image_url]
+                : [];
+        setActiveImage(images[0] || '');
+    }, [product]);
 
     useEffect(() => {
         if (!product || Number(product.price) !== 0) return;
@@ -278,6 +289,12 @@ function ProductDetailPage() {
     const canEditBid = canBid && myBid && myBid.status === 'pending';
     const canChatForFree = isFreeItem && myBid?.status === 'accepted';
 
+    const imageGallery = product.image_urls?.length
+        ? product.image_urls
+        : product.image_url
+            ? [product.image_url]
+            : [];
+
     return (
         <div className="product-detail-page" style={{ minHeight: '80vh', paddingTop: 'var(--space-8)', paddingBottom: 'var(--space-10)' }}>
             <div className="container" style={{ maxWidth: 960 }}>
@@ -301,7 +318,7 @@ function ProductDetailPage() {
                         {/* Image */}
                         <div style={{ position: 'relative', minHeight: 320 }}>
                             <img
-                                src={product.image_url}
+                                src={activeImage || product.image_url}
                                 alt={product.title}
                                 style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', minHeight: 320 }}
                                 onError={(e) => { e.target.src = 'https://placehold.co/600x400/e5e7eb/9ca3af?text=No+Image'; }}
@@ -327,6 +344,41 @@ function ProductDetailPage() {
                                     </span>
                                 </div>
                             )}
+                            {imageGallery.length > 1 && (
+                                <div style={{
+                                    position: 'absolute',
+                                    bottom: 12,
+                                    left: 12,
+                                    right: 12,
+                                    display: 'flex',
+                                    gap: 8,
+                                    overflowX: 'auto',
+                                }}>
+                                    {imageGallery.map((url, idx) => (
+                                        <button
+                                            key={`${url}-${idx}`}
+                                            type="button"
+                                            onClick={() => setActiveImage(url)}
+                                            style={{
+                                                border: activeImage === url ? '2px solid var(--color-primary)' : '1px solid rgba(255,255,255,0.6)',
+                                                borderRadius: 8,
+                                                padding: 0,
+                                                background: 'rgba(255,255,255,0.9)',
+                                                width: 56,
+                                                height: 56,
+                                                overflow: 'hidden',
+                                                cursor: 'pointer',
+                                            }}
+                                        >
+                                            <img
+                                                src={url}
+                                                alt={`Thumbnail ${idx + 1}`}
+                                                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                                            />
+                                        </button>
+                                    ))}
+                                </div>
+                            )}
                         </div>
 
                         {/* Info */}
@@ -334,6 +386,16 @@ function ProductDetailPage() {
                             <h1 style={{ fontSize: 'var(--font-size-2xl)', fontWeight: 700, lineHeight: 1.2 }}>
                                 {product.title}
                             </h1>
+
+                            {isSeller && (
+                                <Link
+                                    to={`/listings/${product.id}/edit`}
+                                    className="btn btn-outline"
+                                    style={{ width: 'fit-content' }}
+                                >
+                                    Edit Listing
+                                </Link>
+                            )}
 
                             <p style={{ fontSize: 'var(--font-size-3xl)', fontWeight: 800, color: isSold ? 'var(--color-gray-400)' : 'var(--color-primary)' }}>
                                 {isFreeItem ? 'Free' : `₦${Number(product.price).toLocaleString()}`}

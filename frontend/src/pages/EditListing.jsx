@@ -1,11 +1,15 @@
-import { useState, useEffect, useRef } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { Link } from 'react-router-dom';
-import { FaCloudUploadAlt, FaSpinner, FaCheckCircle, FaLink, FaImage, FaTimes } from 'react-icons/fa';
-import { createListing, fetchCategories, fetchMyProducts, uploadImage } from '../utils/api';
+import { useEffect, useRef, useState } from 'react';
+import { Link, useNavigate, useParams } from 'react-router-dom';
+import { FaArrowLeft, FaCheckCircle, FaCloudUploadAlt, FaImage, FaLink, FaSpinner, FaTimes } from 'react-icons/fa';
+import { fetchCategories, fetchProduct, updateListing, uploadImage } from '../utils/api';
 import { useAuth } from '../context/AuthContext';
 
-function CreateListing() {
+function EditListing() {
+  const { id } = useParams();
+  const { isAuthenticated, loading, user } = useAuth();
+  const navigate = useNavigate();
+  const fileInputRef = useRef(null);
+
   const [form, setForm] = useState({
     title: '',
     price: '',
@@ -13,20 +17,16 @@ function CreateListing() {
     description: '',
     category_id: '',
   });
-  const [isFree, setIsFree] = useState(false);
-  const [categories, setCategories] = useState([]);
-  const [submitting, setSubmitting] = useState(false);
-  const [uploadingCount, setUploadingCount] = useState(0);
-  const [message, setMessage] = useState({ type: '', text: '' });
-  const [imageMode, setImageMode] = useState('upload');
   const [imageUrls, setImageUrls] = useState([]);
   const [imageInputUrl, setImageInputUrl] = useState('');
+  const [imageMode, setImageMode] = useState('upload');
+  const [isFree, setIsFree] = useState(false);
+  const [categories, setCategories] = useState([]);
+  const [loadingListing, setLoadingListing] = useState(true);
+  const [uploadingCount, setUploadingCount] = useState(0);
+  const [submitting, setSubmitting] = useState(false);
+  const [message, setMessage] = useState({ type: '', text: '' });
   const [dragging, setDragging] = useState(false);
-  const [myProducts, setMyProducts] = useState([]);
-  const [loadingProducts, setLoadingProducts] = useState(false);
-  const fileInputRef = useRef(null);
-  const { isAuthenticated, loading, user } = useAuth();
-  const navigate = useNavigate();
 
   useEffect(() => {
     if (!loading && !isAuthenticated) {
@@ -48,19 +48,33 @@ function CreateListing() {
 
   useEffect(() => {
     if (!isAuthenticated || !user?.id) return;
-    async function loadMyProducts() {
+    async function loadListing() {
       try {
-        setLoadingProducts(true);
-        const payload = await fetchMyProducts();
-        setMyProducts(payload.data || []);
-      } catch {
-        // Silently fail
+        setLoadingListing(true);
+        const payload = await fetchProduct(id);
+        const listing = payload.data;
+        if (!listing?.users?.id || listing.users.id !== user.id) {
+          setMessage({ type: 'error', text: 'You can only edit your own listings.' });
+          return;
+        }
+        setForm({
+          title: listing.title || '',
+          price: listing.price ?? '',
+          quantity: listing.quantity ?? 1,
+          description: listing.description || '',
+          category_id: listing.categories?.id || listing.category_id || '',
+        });
+        const images = listing.image_urls?.length ? listing.image_urls : listing.image_url ? [listing.image_url] : [];
+        setImageUrls(images);
+        setIsFree(Number(listing.price) === 0);
+      } catch (err) {
+        setMessage({ type: 'error', text: err.message });
       } finally {
-        setLoadingProducts(false);
+        setLoadingListing(false);
       }
     }
-    loadMyProducts();
-  }, [isAuthenticated, user?.id]);
+    loadListing();
+  }, [id, isAuthenticated, user?.id]);
 
   function handleChange(e) {
     const { name, value } = e.target;
@@ -140,37 +154,31 @@ function CreateListing() {
     setMessage({ type: '', text: '' });
 
     if (!imageUrls.length) {
-      setMessage({ type: 'error', text: 'Please upload an image or provide a URL.' });
+      setMessage({ type: 'error', text: 'Please upload at least one image.' });
       return;
     }
 
     try {
       setSubmitting(true);
-      await createListing({
+      const payload = {
         ...form,
         image_urls: imageUrls,
         price: isFree ? 0 : Number(form.price),
         quantity: Math.max(1, Number(form.quantity) || 1),
         category_id: Number(form.category_id),
-      });
-      setMessage({ type: 'success', text: 'Listing published successfully!' });
-      setForm({ title: '', price: '', quantity: 1, description: '', category_id: '' });
-      setIsFree(false);
-      setImageUrls([]);
-      setImageInputUrl('');
-      const payload = await fetchMyProducts();
-      setMyProducts(payload.data || []);
-    } catch (error) {
-      setMessage({ type: 'error', text: error.message });
+      };
+      await updateListing(id, payload);
+      setMessage({ type: 'success', text: 'Listing updated successfully!' });
+    } catch (err) {
+      setMessage({ type: 'error', text: err.message });
     } finally {
       setSubmitting(false);
     }
   }
 
-  if (loading) return null;
+  if (loading || loadingListing) return null;
 
   const uploading = uploadingCount > 0;
-
   const dropZoneStyle = {
     border: `2px dashed ${dragging ? 'var(--color-primary)' : 'var(--color-gray-300)'}`,
     borderRadius: '12px',
@@ -185,9 +193,12 @@ function CreateListing() {
     <div className="create-listing-page">
       <div className="container">
         <div className="create-listing-card fade-in-up">
-          <h1>Create a Listing</h1>
+          <Link to="/marketplace" className="btn btn-outline" style={{ width: 'fit-content', marginBottom: 'var(--space-4)' }}>
+            <FaArrowLeft /> Back
+          </Link>
+          <h1>Edit Listing</h1>
           <p className="listing-subtitle">
-            Fill in the details below to publish your item to the marketplace.
+            Update your listing details and images.
           </p>
 
           {message.text && (
@@ -293,7 +304,6 @@ function CreateListing() {
               />
             </div>
 
-            {/* Image Mode Toggle */}
             <div className="input-group">
               <label>Product Images (up to 3)</label>
               <div style={{ display: 'flex', gap: '8px', marginBottom: '12px' }}>
@@ -317,7 +327,6 @@ function CreateListing() {
 
               {imageMode === 'upload' ? (
                 <>
-                  {/* Hidden real file input */}
                   <input
                     ref={fileInputRef}
                     type="file"
@@ -327,7 +336,6 @@ function CreateListing() {
                     style={{ display: 'none' }}
                   />
 
-                  {/* Custom drop zone */}
                   {imageUrls.length < 3 && (
                     <div
                       style={dropZoneStyle}
@@ -377,7 +385,6 @@ function CreateListing() {
                 </div>
               )}
 
-              {/* Image Preview */}
               {imageUrls.length > 0 && (
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12, marginTop: 12 }}>
                   {imageUrls.map((url, idx) => (
@@ -433,73 +440,19 @@ function CreateListing() {
             >
               {submitting ? (
                 <>
-                  <FaSpinner className="spinner" /> Publishing...
+                  <FaSpinner className="spinner" /> Saving...
                 </>
               ) : (
                 <>
-                  <FaCloudUploadAlt /> Publish Listing
+                  <FaCloudUploadAlt /> Save Changes
                 </>
               )}
             </button>
           </form>
-
-          <div style={{ marginTop: 'var(--space-10)' }}>
-            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-4)' }}>
-              <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 700 }}>Your Listings</h3>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
-                <Link to="/my-listings" className="btn btn-outline" style={{ fontSize: '0.75rem', padding: '6px 10px' }}>
-                  View All
-                </Link>
-                {loadingProducts && (
-                  <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-gray-500)' }}>
-                    <FaSpinner className="spinner" /> Loading...
-                  </span>
-                )}
-              </div>
-            </div>
-            {loadingProducts ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--color-gray-500)' }}>
-                <FaSpinner className="spinner" /> Loading your listings...
-              </div>
-            ) : myProducts.length === 0 ? (
-              <p style={{ color: 'var(--color-gray-500)' }}>You have no listings yet.</p>
-            ) : (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 'var(--space-4)' }}>
-                {myProducts.map((p) => {
-                  const cover = p.image_urls?.[0] || p.image_url;
-                  return (
-                    <div key={p.id} style={{ border: '1px solid var(--color-gray-100)', borderRadius: 'var(--radius-lg)', overflow: 'hidden', background: 'var(--color-white)' }}>
-                      <img
-                        src={cover || 'https://placehold.co/300x200/e5e7eb/9ca3af?text=No+Image'}
-                        alt={p.title}
-                        style={{ width: '100%', height: 140, objectFit: 'cover', display: 'block' }}
-                        onError={(e) => { e.target.src = 'https://placehold.co/300x200/e5e7eb/9ca3af?text=No+Image'; }}
-                      />
-                      <div style={{ padding: 'var(--space-3)' }}>
-                        <p style={{ fontWeight: 600, fontSize: 'var(--font-size-sm)', marginBottom: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                          {p.title}
-                        </p>
-                        <p style={{ fontWeight: 700, color: 'var(--color-primary)', fontSize: 'var(--font-size-sm)', marginBottom: 8 }}>
-                          {Number(p.price) === 0 ? 'Free' : `₦${Number(p.price).toLocaleString()}`}
-                        </p>
-                        <Link
-                          to={`/listings/${p.id}/edit`}
-                          className="btn btn-outline"
-                          style={{ width: '100%', fontSize: '0.75rem', padding: '6px 10px' }}
-                        >
-                          Edit Listing
-                        </Link>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-          </div>
         </div>
       </div>
     </div>
   );
 }
 
-export default CreateListing;
+export default EditListing;

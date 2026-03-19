@@ -3,7 +3,7 @@ import { FaBoxOpen, FaSpinner } from 'react-icons/fa';
 import { fetchProducts } from '../utils/api';
 import ProductCard from './ProductCard';
 
-function MarketplaceFeed({ searchQuery, selectedCategory }) {
+function MarketplaceFeed({ searchQuery, selectedCategory, sort }) {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -18,7 +18,8 @@ function MarketplaceFeed({ searchQuery, selectedCategory }) {
         setError('');
         const payload = await fetchProducts({
           q: trimmedQuery || undefined,
-          category: selectedCategory || undefined
+          category: selectedCategory || undefined,
+          sort: sort || undefined
         });
         if (!isActive) return;
         setProducts(payload.data || []);
@@ -39,7 +40,7 @@ function MarketplaceFeed({ searchQuery, selectedCategory }) {
       isActive = false;
       clearTimeout(timeout);
     };
-  }, [trimmedQuery, selectedCategory]);
+  }, [trimmedQuery, selectedCategory, sort]);
 
   if (loading) {
     return (

@@ -705,6 +705,9 @@ function AdminDashboard() {
                             <p style={{ fontSize: '0.75rem', color: 'var(--color-gray-400)', marginTop: '4px' }}>
                               Joined {formatDate(u.created_at)}
                             </p>
+                            <p style={{ fontSize: '0.70rem', color: u.last_login ? 'var(--color-primary-light)' : 'var(--color-gray-400)', marginTop: '2px' }}>
+                              Last login: {u.last_login ? formatDate(u.last_login) : 'N/A'}
+                            </p>
                           </div>
 
                           <div className="admin-cell" data-label="Stats">

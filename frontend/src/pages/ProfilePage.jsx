@@ -1,4 +1,5 @@
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 import { useNavigate } from 'react-router-dom';
 import {
     FaUser, FaEnvelope, FaBuilding, FaPhone, FaMapMarkerAlt,
@@ -6,7 +7,7 @@ import {
     FaStore, FaShieldAlt,
 } from 'react-icons/fa';
 import { useAuth } from '../context/AuthContext';
-import { updateMyProfile, uploadImage, requestVerification } from '../utils/api';
+import { fetchMyProducts, updateMyProfile, uploadImage, requestVerification } from '../utils/api';
 
 function ProfilePage() {
     const { user, loading, isAuthenticated, refreshUser } = useAuth();
@@ -23,6 +24,8 @@ function ProfilePage() {
     const [uploadingProof, setUploadingProof] = useState(false);
     const [verifyProofPreview, setVerifyProofPreview] = useState('');
     const [localAvatarUrl, setLocalAvatarUrl] = useState(null);
+    const [myProducts, setMyProducts] = useState([]);
+    const [loadingProducts, setLoadingProducts] = useState(false);
     const fileInputRef = useRef(null);
 
     if (loading) return null;
@@ -30,6 +33,22 @@ function ProfilePage() {
         navigate('/login');
         return null;
     }
+
+    useEffect(() => {
+        if (!isAuthenticated) return;
+        async function loadMyProducts() {
+            try {
+                setLoadingProducts(true);
+                const payload = await fetchMyProducts();
+                setMyProducts(payload.data || []);
+            } catch {
+                // Silently fail
+            } finally {
+                setLoadingProducts(false);
+            }
+        }
+        loadMyProducts();
+    }, [isAuthenticated]);
 
     function startEditing() {
         setForm({
@@ -286,6 +305,60 @@ function ProfilePage() {
                                     </div>
                                 </form>
                             )}
+
+                            <div style={{ marginTop: 'var(--space-6)' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-3)' }}>
+                                    <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 700 }}>Your Listings</h3>
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
+                                        <Link to="/my-listings" className="btn btn-outline" style={{ fontSize: '0.75rem', padding: '6px 10px' }}>
+                                            View All
+                                        </Link>
+                                        {loadingProducts && (
+                                            <span style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-gray-500)' }}>
+                                                <FaSpinner className="spinner" /> Loading...
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+                                {loadingProducts ? (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--color-gray-500)' }}>
+                                        <FaSpinner className="spinner" /> Loading your listings...
+                                    </div>
+                                ) : myProducts.length === 0 ? (
+                                    <p style={{ color: 'var(--color-gray-500)' }}>You have no listings yet.</p>
+                                ) : (
+                                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 'var(--space-4)' }}>
+                                        {myProducts.map((p) => {
+                                            const cover = p.image_urls?.[0] || p.image_url;
+                                            return (
+                                                <div key={p.id} style={{ border: '1px solid var(--color-gray-100)', borderRadius: 'var(--radius-lg)', overflow: 'hidden', background: 'var(--color-white)' }}>
+                                                    <img
+                                                        src={cover || 'https://placehold.co/300x200/e5e7eb/9ca3af?text=No+Image'}
+                                                        alt={p.title}
+                                                        style={{ width: '100%', height: 140, objectFit: 'cover', display: 'block' }}
+                                                        onError={(e) => { e.target.src = 'https://placehold.co/300x200/e5e7eb/9ca3af?text=No+Image'; }}
+                                                    />
+                                                    <div style={{ padding: 'var(--space-3)' }}>
+                                                        <p style={{ fontWeight: 600, fontSize: 'var(--font-size-sm)', marginBottom: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                                                            {p.title}
+                                                        </p>
+                                                        <p style={{ fontWeight: 700, color: 'var(--color-primary)', fontSize: 'var(--font-size-sm)', marginBottom: 8 }}>
+                                                            {Number(p.price) === 0 ? 'Free' : `₦${Number(p.price).toLocaleString()}`}
+                                                        </p>
+                                                        <Link
+                                                            to={`/listings/${p.id}/edit`}
+                                                            className="btn btn-outline"
+                                                            style={{ width: '100%', fontSize: '0.75rem', padding: '6px 10px' }}
+                                                        >
+                                                            Edit Listing
+                                                        </Link>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                )}
+                            </div>
                         </div>
                     ) : (
                         <form onSubmit={handleSave} style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-5, 1.25rem)' }}>

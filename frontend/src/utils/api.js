@@ -45,9 +45,21 @@ export async function fetchSellerProducts(sellerId) {
   return apiFetch(`/products/seller/${sellerId}`);
 }
 
+export async function fetchMyProducts() {
+  return apiFetch('/products/mine');
+}
+
 export async function createListing(formData) {
   return apiFetch('/products', {
     method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(formData),
+  });
+}
+
+export async function updateListing(productId, formData) {
+  return apiFetch(`/products/${productId}`, {
+    method: 'PUT',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify(formData),
   });
