@@ -2,17 +2,39 @@ const nodemailer = require('nodemailer');
 
 class EmailService {
   constructor() {
+    const smtpPort = Number(process.env.SMTP_PORT) || 465;
+
     this.transporter = nodemailer.createTransport({
       host: process.env.SMTP_HOST || 'smtp.gmail.com',
-      port: Number(process.env.SMTP_PORT) || 587,
-      secure: false,
+      port: smtpPort,
+      secure: smtpPort === 465, // true for 465 (SSL), false for 587 (STARTTLS)
       auth: {
         user: process.env.SMTP_USER,
         pass: process.env.SMTP_PASS,
       },
+      tls: {
+        rejectUnauthorized: false, // helps on some cloud platforms
+      },
     });
 
     this.from = process.env.SMTP_FROM || `"UniTrade OAU" <${process.env.SMTP_USER}>`;
+
+    // Verify SMTP connection on startup
+    this.verifyConnection();
+  }
+
+  async verifyConnection() {
+    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+      console.log('[Email] SMTP not configured — skipping verification.');
+      return;
+    }
+    try {
+      await this.transporter.verify();
+      console.log('[Email] ✅ SMTP connection verified successfully.');
+    } catch (err) {
+      console.error('[Email] ❌ SMTP connection FAILED:', err.message);
+      console.error('[Email] Full error:', JSON.stringify(err, null, 2));
+    }
   }
 
   async send(to, subject, html) {
@@ -23,10 +45,11 @@ class EmailService {
     }
 
     try {
-      await this.transporter.sendMail({ from: this.from, to, subject, html });
-      console.log(`[Email] Sent to ${to}: "${subject}"`);
+      const info = await this.transporter.sendMail({ from: this.from, to, subject, html });
+      console.log(`[Email] Sent to ${to}: "${subject}" (messageId: ${info.messageId})`);
     } catch (err) {
       console.error(`[Email] Failed to send to ${to}:`, err.message);
+      console.error(`[Email] Error code: ${err.code}, command: ${err.command}`);
     }
   }
 
