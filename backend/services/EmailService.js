@@ -12,7 +12,7 @@ class EmailService {
       },
     });
 
-    this.from = process.env.SMTP_FROM || '"UniTrade OAU" <noreply@unitrade.oau>';
+    this.from = process.env.SMTP_FROM || `"UniTrade OAU" <${process.env.SMTP_USER}>`;
   }
 
   async send(to, subject, html) {
