@@ -1,19 +1,16 @@
+const EmailService = require('./EmailService');
+
 const DEFAULT_DAILY_LIMIT = 300;
 
 class PromoService {
   constructor(supabaseClient) {
     this.supabase = supabaseClient;
-    this.brevoApiKey = process.env.BREVO_API_KEY;
-    this.senderEmail = process.env.BREVO_SENDER_EMAIL;
-    this.senderName = process.env.BREVO_SENDER_NAME || 'UniTrade OAU';
+    this.emailService = new EmailService();
   }
 
   getEmailConfigStatus() {
-    if (!this.brevoApiKey) {
-      return { ok: false, reason: 'Missing BREVO_API_KEY' };
-    }
-    if (!this.senderEmail) {
-      return { ok: false, reason: 'Missing BREVO_SENDER_EMAIL' };
+    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+      return { ok: false, reason: 'Missing SMTP_USER or SMTP_PASS' };
     }
     return { ok: true };
   }
@@ -54,7 +51,7 @@ class PromoService {
   async sendPendingBatch(limit = DEFAULT_DAILY_LIMIT, promotionId = null) {
     const config = this.getEmailConfigStatus();
     if (!config.ok) {
-      return { attempted: 0, sent: 0, failed: 0, error: `Brevo not configured: ${config.reason}` };
+      return { attempted: 0, sent: 0, failed: 0, error: `Email not configured: ${config.reason}` };
     }
 
     let query = this.supabase
@@ -90,12 +87,31 @@ class PromoService {
       }
 
       try {
-        await this._sendBrevoEmail({
-          toEmail: user.oau_email,
-          toName: user.name,
-          subject: promo.title,
-          html: `<p>${promo.message}</p>`,
-        });
+        const html = `
+          <div style="font-family: 'Inter', sans-serif; max-width: 520px; margin: auto; padding: 32px; background: #f9fafb; border-radius: 16px;">
+            <div style="text-align: center; margin-bottom: 24px;">
+              <h1 style="color: #059669; margin: 0; font-size: 24px;">🌟 UniTrade Update</h1>
+            </div>
+            <div style="background: white; padding: 24px; border-radius: 12px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+              <p style="color: #374151; font-size: 16px;">Hi <strong>${user.name}</strong>,</p>
+              <div style="color: #4b5563; line-height: 1.6; margin-top: 16px;">
+                ${promo.message.replace(/\n/g, '<br>')}
+              </div>
+              <div style="text-align: center; margin: 32px 0 16px;">
+                <a href="${process.env.FRONTEND_ORIGIN || 'http://localhost:5173'}"
+                   style="display: inline-block; background: #059669; color: white; padding: 12px 32px;
+                          border-radius: 8px; text-decoration: none; font-weight: 600; font-size: 14px;">
+                  Visit UniTrade
+                </a>
+              </div>
+              <p style="color: #9ca3af; font-size: 13px; text-align: center;">
+                &mdash; The UniTrade OAU Team
+              </p>
+            </div>
+          </div>
+        `;
+
+        await this.emailService.send(user.oau_email, promo.title, html);
         await this._markRecipient(item.id, 'sent');
         sent += 1;
       } catch (err) {
@@ -126,32 +142,6 @@ class PromoService {
       .eq('id', id);
 
     if (error) throw error;
-  }
-
-  async _sendBrevoEmail({ toEmail, toName, subject, html }) {
-    const fetchFn = typeof fetch === 'function'
-      ? fetch
-      : (await import('node-fetch')).default;
-
-    const res = await fetchFn('https://api.brevo.com/v3/smtp/email', {
-      method: 'POST',
-      headers: {
-        'api-key': this.brevoApiKey,
-        'Content-Type': 'application/json',
-        accept: 'application/json',
-      },
-      body: JSON.stringify({
-        sender: { email: this.senderEmail, name: this.senderName },
-        to: [{ email: toEmail, name: toName }],
-        subject,
-        htmlContent: html,
-      }),
-    });
-
-    if (!res.ok) {
-      const payload = await res.json().catch(() => ({}));
-      throw new Error(payload?.message || 'Brevo send failed');
-    }
   }
 }
 

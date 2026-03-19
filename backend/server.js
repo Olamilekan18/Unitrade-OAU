@@ -204,7 +204,7 @@ app.delete('/api/sessions', async (req, res) => {
       if (decoded && decoded.jti) {
         await supabase.from('blacklisted_tokens').insert({ jti: decoded.jti, expires_at: new Date(decoded.exp * 1000).toISOString() });
       }
-    } catch (e) {}
+    } catch (e) { }
   }
   const isProd = process.env.NODE_ENV === 'production';
   res.clearCookie('access_token', {
@@ -872,6 +872,31 @@ app.put('/api/orders/:id/seller-delivered', verifyJwt, async (req, res, next) =>
       entityId: order.id
     });
     res.json({ success: true, data: order });
+
+    (async () => {
+      try {
+        const { data: fullOrder } = await supabase
+          .from('orders')
+          .select(`
+            products:product_id(title),
+            buyer:buyer_id(name, oau_email),
+            seller:seller_id(store_name, name)
+          `)
+          .eq('id', req.params.id)
+          .single();
+
+        if (fullOrder && fullOrder.buyer && fullOrder.seller && fullOrder.products) {
+          await emailService.sendItemDeliveredEmail({
+            buyerEmail: fullOrder.buyer.oau_email,
+            buyerName: fullOrder.buyer.name,
+            sellerName: fullOrder.seller.store_name || fullOrder.seller.name,
+            productTitle: fullOrder.products.title
+          });
+        }
+      } catch (e) {
+        console.error('[Delivery Email]', e.message);
+      }
+    })();
   } catch (error) {
     next(error);
   }
@@ -887,6 +912,32 @@ app.put('/api/orders/:id/confirm', verifyJwt, async (req, res, next) => {
       entityId: order.id
     });
     res.json({ success: true, data: order });
+
+    (async () => {
+      try {
+        const { data: fullOrder } = await supabase
+          .from('orders')
+          .select(`
+            products:product_id(title),
+            buyer:buyer_id(name, oau_email),
+            seller:seller_id(id, store_name, name)
+          `)
+          .eq('id', req.params.id)
+          .single();
+
+        if (fullOrder && fullOrder.buyer && fullOrder.seller && fullOrder.products) {
+          await emailService.sendReviewRequestEmail({
+            buyerEmail: fullOrder.buyer.oau_email,
+            buyerName: fullOrder.buyer.name,
+            sellerName: fullOrder.seller.store_name || fullOrder.seller.name,
+            sellerId: fullOrder.seller.id,
+            productTitle: fullOrder.products.title
+          });
+        }
+      } catch (e) {
+        console.error('[Review Request Email]', e.message);
+      }
+    })();
   } catch (error) {
     next(error);
   }

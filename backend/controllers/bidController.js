@@ -2,10 +2,12 @@ const supabase = require('../config/supabaseClient');
 const BidService = require('../services/BidService');
 const AuditService = require('../services/AuditService');
 const NotificationService = require('../services/NotificationService');
+const EmailService = require('../services/EmailService');
 
 const bidService = new BidService(supabase);
 const auditService = new AuditService(supabase);
 const notificationService = new NotificationService(supabase);
+const emailService = new EmailService();
 
 class BidController {
   static async getBidCount(req, res, next) {
@@ -33,6 +35,30 @@ class BidController {
         metadata: { productId }
       });
       res.status(201).json({ success: true, data: bid });
+
+      // Notify seller
+      (async () => {
+        try {
+          const [productRes, bidderRes] = await Promise.all([
+            supabase.from('products').select('title, seller_id').eq('id', productId).single(),
+            supabase.from('users').select('name').eq('id', req.user.id).single()
+          ]);
+          if (productRes.data && bidderRes.data) {
+            const { data: seller } = await supabase.from('users').select('name, oau_email').eq('id', productRes.data.seller_id).single();
+            if (seller) {
+              await emailService.sendNewBidEmail({
+                sellerEmail: seller.oau_email,
+                sellerName: seller.name,
+                buyerName: bidderRes.data.name,
+                productTitle: productRes.data.title,
+                note
+              });
+            }
+          }
+        } catch (e) {
+          console.error('[Bid Email]', e.message);
+        }
+      })();
     } catch (error) {
       next(error);
     }
@@ -65,6 +91,27 @@ class BidController {
           'info',
           `Your bid was accepted! You can now chat with the seller for "${bid.product.title || 'the item'}".`
         );
+
+        // Send Email to Buyer
+        (async () => {
+          try {
+            const [buyerRes, sellerRes] = await Promise.all([
+              supabase.from('users').select('name, oau_email').eq('id', bid.bidder_id).single(),
+              supabase.from('users').select('name').eq('id', req.user.id).single()
+            ]);
+
+            if (buyerRes.data && sellerRes.data) {
+              await emailService.sendBidAcceptedEmail({
+                buyerEmail: buyerRes.data.oau_email,
+                buyerName: buyerRes.data.name,
+                sellerName: sellerRes.data.name,
+                productTitle: bid.product.title
+              });
+            }
+          } catch (e) {
+            console.error('[Bid Accept Email]', e.message);
+          }
+        })();
       }
       await auditService.log({
         actorId: req.user.id,

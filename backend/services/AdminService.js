@@ -61,7 +61,34 @@ class AdminService {
 
     const { data, error } = await query;
     if (error) throw error;
-    return data || [];
+    const users = data || [];
+    if (!users.length) return users;
+
+    const userIds = users.map((u) => u.id);
+
+    const [{ data: orderRows, error: ordersError }, { data: productRows, error: productsError }] = await Promise.all([
+      this.supabase.from('orders').select('buyer_id').in('buyer_id', userIds),
+      this.supabase.from('products').select('seller_id').in('seller_id', userIds),
+    ]);
+
+    if (ordersError) throw ordersError;
+    if (productsError) throw productsError;
+
+    const orderCounts = (orderRows || []).reduce((acc, row) => {
+      acc[row.buyer_id] = (acc[row.buyer_id] || 0) + 1;
+      return acc;
+    }, {});
+
+    const productCounts = (productRows || []).reduce((acc, row) => {
+      acc[row.seller_id] = (acc[row.seller_id] || 0) + 1;
+      return acc;
+    }, {});
+
+    return users.map((u) => ({
+      ...u,
+      order_count: orderCounts[u.id] || 0,
+      product_count: productCounts[u.id] || 0,
+    }));
   }
 
   async listAccessRequests() {
