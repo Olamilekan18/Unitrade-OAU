@@ -28,8 +28,31 @@ const { registerValidation, loginValidation, reviewValidation } = require('./mid
 const helmet = require('helmet');
 const rateLimit = require('express-rate-limit');
 const app = express();
-app.use(helmet());
 app.set('trust proxy', 1);
+
+// Allow local dev and Vercel deployed frontend
+const allowedOrigins = [
+  'http://localhost:5173',
+  'https://unitrade-oau.vercel.app',
+  process.env.FRONTEND_ORIGIN
+].filter(Boolean);
+
+app.use(cors({
+  origin: function (origin, callback) {
+    // allow requests with no origin (like mobile apps or curl)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      callback(new Error('Not allowed by CORS'));
+    }
+  },
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'x-webhook-secret', 'x-paystack-signature']
+}));
+
+app.use(helmet());
 const userService = new UserService(supabase);
 const categoryService = new CategoryService(supabase);
 const reviewService = new ReviewService(supabase);
@@ -53,25 +76,7 @@ cron.schedule('0 9 * * *', () => {
   promoService.sendPendingBatch(300);
 });
 
-// Allow local dev and Vercel deployed frontend
-const allowedOrigins = [
-  'http://localhost:5173',
-  'https://unitrade-oau.vercel.app',
-  process.env.FRONTEND_ORIGIN // Fallback if set in Render env
-].filter(Boolean);
-
-app.use(
-  cors({
-    origin: function (origin, callback) {
-      if (!origin || allowedOrigins.includes(origin)) {
-        callback(null, true);
-      } else {
-        callback(new Error('Not allowed by CORS'));
-      }
-    },
-    credentials: true,
-  })
-);
+// Body parsing and security middleware
 app.use(express.json());
 app.use(cookieParser());
 
