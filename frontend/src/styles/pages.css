@@ -177,6 +177,8 @@
     display: flex;
     height: calc(100vh - var(--nav-height));
     min-height: calc(100vh - var(--nav-height));
+    height: calc(100svh - var(--nav-height));
+    min-height: calc(100svh - var(--nav-height));
     height: calc(100dvh - var(--nav-height));
     min-height: calc(100dvh - var(--nav-height));
     overflow: hidden;
@@ -186,10 +188,18 @@
 @media (max-width: 768px) {
     .chat-page {
         padding: 0;
+        overflow: hidden;
     }
 
     .chat-thread {
         min-height: 0;
+        width: 100%;
+        min-width: 0;
+    }
+
+    .chat-sidebar {
+        width: 100%;
+        min-width: 0;
     }
 }
 
