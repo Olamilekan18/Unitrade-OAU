@@ -64,17 +64,44 @@ const walletService = new WalletService(supabase);
 const auditService = new AuditService(supabase);
 const promoService = new PromoService(supabase);
 
+const CRON_TZ = process.env.CRON_TZ || 'Africa/Lagos';
+
+function createJobRunner(name, fn) {
+  let running = false;
+  return async (reason = 'scheduled') => {
+    if (running) {
+      console.warn(`[Cron] ${name} skipped (${reason}): already running`);
+      return;
+    }
+    running = true;
+    try {
+      console.log(`[Cron] ${name} started (${reason})`);
+      await fn();
+      console.log(`[Cron] ${name} completed (${reason})`);
+    } catch (err) {
+      console.error(`[Cron] ${name} failed (${reason}):`, err.message || err);
+    } finally {
+      running = false;
+    }
+  };
+}
+
+const runAutoReleases = createJobRunner('auto-releases', () => orderService.processAutoReleases());
+const runPromoBatch = createJobRunner('promo-batch', () => promoService.sendPendingBatch(300));
+
 // --- Background Job For Escrow Auto Releases ---
 // Run every hour to check for 24-hours expired shipped orders
-cron.schedule('0 * * * *', () => {
-  orderService.processAutoReleases();
-});
+cron.schedule('0 * * * *', runAutoReleases, { timezone: CRON_TZ, recoverMissedExecutions: true });
 
 // --- Daily Promotion Batch Sender (Brevo) ---
 // Sends up to 300 queued promo emails per day
-cron.schedule('0 9 * * *', () => {
-  promoService.sendPendingBatch(300);
-});
+cron.schedule('0 9 * * *', runPromoBatch, { timezone: CRON_TZ, recoverMissedExecutions: true });
+
+// Catch up on startup in case scheduled runs were missed
+setTimeout(() => {
+  runAutoReleases('startup');
+  runPromoBatch('startup');
+}, 5000);
 
 // Body parsing and security middleware
 app.use(express.json());

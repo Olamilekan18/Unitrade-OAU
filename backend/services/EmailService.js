@@ -1,56 +1,58 @@
+const { Resend } = require('resend');
 const nodemailer = require('nodemailer');
 
 class EmailService {
   constructor() {
-    const smtpPort = Number(process.env.SMTP_PORT) || 465;
+    // Use Resend HTTP API in production (Render blocks SMTP ports)
+    // Falls back to Gmail SMTP for local development
+    this.useResend = !!process.env.RESEND_API_KEY;
 
-    this.transporter = nodemailer.createTransport({
-      host: process.env.SMTP_HOST || 'smtp.gmail.com',
-      port: smtpPort,
-      secure: smtpPort === 465, // true for 465 (SSL), false for 587 (STARTTLS)
-      auth: {
-        user: process.env.SMTP_USER,
-        pass: process.env.SMTP_PASS,
-      },
-      tls: {
-        rejectUnauthorized: false,
-      },
-      family: 4, // Force IPv4 — Render's IPv6 cannot reach Gmail SMTP
-    });
-
-    this.from = process.env.SMTP_FROM || `"UniTrade OAU" <${process.env.SMTP_USER}>`;
-
-    // Verify SMTP connection on startup
-    this.verifyConnection();
-  }
-
-  async verifyConnection() {
-    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
-      console.log('[Email] SMTP not configured — skipping verification.');
-      return;
-    }
-    try {
-      await this.transporter.verify();
-      console.log('[Email] ✅ SMTP connection verified successfully.');
-    } catch (err) {
-      console.error('[Email] ❌ SMTP connection FAILED:', err.message);
-      console.error('[Email] Full error:', JSON.stringify(err, null, 2));
+    if (this.useResend) {
+      this.resend = new Resend(process.env.RESEND_API_KEY);
+      this.from = process.env.RESEND_FROM || 'UniTrade OAU <onboarding@resend.dev>';
+      console.log('[Email] ✅ Using Resend HTTP API for email delivery.');
+    } else {
+      // Local development fallback: Gmail SMTP
+      const smtpPort = Number(process.env.SMTP_PORT || process.env.EMAIL_PORT || process.env.SMTP_PORT_NUMBER) || 587;
+      this.transporter = nodemailer.createTransport({
+        host: process.env.SMTP_HOST || 'smtp.gmail.com',
+        port: smtpPort,
+        secure: smtpPort === 465,
+        auth: {
+          user: process.env.SMTP_USER,
+          pass: process.env.SMTP_PASS,
+        },
+      });
+      this.from = `"UniTrade OAU" <${process.env.SMTP_USER}>`;
+      console.log('[Email] Using Gmail SMTP for local email delivery.');
     }
   }
 
   async send(to, subject, html) {
-    // Skip if SMTP is not configured
-    if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
-      console.log(`[Email] SMTP not configured. Would have sent to ${to}: "${subject}"`);
-      return;
-    }
-
     try {
-      const info = await this.transporter.sendMail({ from: this.from, to, subject, html });
-      console.log(`[Email] Sent to ${to}: "${subject}" (messageId: ${info.messageId})`);
+      if (this.useResend) {
+        const { data, error } = await this.resend.emails.send({
+          from: this.from,
+          to: [to],
+          subject,
+          html,
+        });
+        if (error) {
+          console.error(`[Email] ❌ Resend error for ${to}:`, JSON.stringify(error));
+          return;
+        }
+        console.log(`[Email] ✅ Sent to ${to}: "${subject}" (id: ${data.id})`);
+      } else {
+        // Gmail SMTP fallback (local dev)
+        if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
+          console.log(`[Email] SMTP not configured. Would have sent to ${to}: "${subject}"`);
+          return;
+        }
+        const info = await this.transporter.sendMail({ from: this.from, to, subject, html });
+        console.log(`[Email] ✅ Sent to ${to}: "${subject}" (messageId: ${info.messageId})`);
+      }
     } catch (err) {
-      console.error(`[Email] Failed to send to ${to}:`, err.message);
-      console.error(`[Email] Error code: ${err.code}, command: ${err.command}`);
+      console.error(`[Email] ❌ Failed to send to ${to}:`, err.message);
     }
   }
 
