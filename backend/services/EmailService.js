@@ -1,18 +1,19 @@
-const { Resend } = require('resend');
 const nodemailer = require('nodemailer');
 
 class EmailService {
   constructor() {
-    // Use Resend HTTP API in production (Render blocks SMTP ports)
-    // Falls back to Gmail SMTP for local development
-    this.useResend = !!process.env.RESEND_API_KEY;
+    // Prefer Brevo HTTP API in production (Render blocks SMTP ports)
+    // Falls back to SMTP for local development
+    this.useBrevo = !!process.env.BREVO_API_KEY;
 
-    if (this.useResend) {
-      this.resend = new Resend(process.env.RESEND_API_KEY);
-      this.from = process.env.RESEND_FROM || 'UniTrade OAU <onboarding@resend.dev>';
-      console.log('[Email] ✅ Using Resend HTTP API for email delivery.');
+    if (this.useBrevo) {
+      this.brevoApiKey = process.env.BREVO_API_KEY;
+      this.fromEmail = process.env.BREVO_SENDER_EMAIL;
+      this.fromName = process.env.BREVO_SENDER_NAME || 'UniTrade OAU';
+      this.from = `${this.fromName} <${this.fromEmail}>`;
+      console.log('[Email] ✅ Using Brevo HTTP API for email delivery.');
     } else {
-      // Local development fallback: Gmail SMTP
+      // Local development fallback: SMTP
       const smtpPort = Number(process.env.SMTP_PORT || process.env.EMAIL_PORT || process.env.SMTP_PORT_NUMBER) || 587;
       this.transporter = nodemailer.createTransport({
         host: process.env.SMTP_HOST || 'smtp.gmail.com',
@@ -24,26 +25,44 @@ class EmailService {
         },
       });
       this.from = `"UniTrade OAU" <${process.env.SMTP_USER}>`;
-      console.log('[Email] Using Gmail SMTP for local email delivery.');
+      console.log('[Email] Using SMTP for local email delivery.');
     }
   }
 
   async send(to, subject, html) {
     try {
-      if (this.useResend) {
-        const { data, error } = await this.resend.emails.send({
-          from: this.from,
-          to: [to],
-          subject,
-          html,
-        });
-        if (error) {
-          console.error(`[Email] ❌ Resend error for ${to}:`, JSON.stringify(error));
+      if (this.useBrevo) {
+        if (!this.fromEmail) {
+          console.error('[Email] ❌ Missing BREVO_SENDER_EMAIL');
           return;
         }
-        console.log(`[Email] ✅ Sent to ${to}: "${subject}" (id: ${data.id})`);
+        const fetchFn = typeof fetch === 'function'
+          ? fetch
+          : (await import('node-fetch')).default;
+
+        const res = await fetchFn('https://api.brevo.com/v3/smtp/email', {
+          method: 'POST',
+          headers: {
+            'api-key': this.brevoApiKey,
+            'Content-Type': 'application/json',
+            accept: 'application/json',
+          },
+          body: JSON.stringify({
+            sender: { email: this.fromEmail, name: this.fromName },
+            to: [{ email: to }],
+            subject,
+            htmlContent: html,
+          }),
+        });
+
+        if (!res.ok) {
+          const payload = await res.json().catch(() => ({}));
+          console.error(`[Email] ❌ Brevo error for ${to}:`, payload?.message || res.statusText);
+          return;
+        }
+        console.log(`[Email] ✅ Sent to ${to}: "${subject}" (Brevo)`);
       } else {
-        // Gmail SMTP fallback (local dev)
+        // SMTP fallback (local dev)
         if (!process.env.SMTP_USER || !process.env.SMTP_PASS) {
           console.log(`[Email] SMTP not configured. Would have sent to ${to}: "${subject}"`);
           return;
