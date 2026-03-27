@@ -8,7 +8,7 @@ class ProductService {
       .from('products')
       .insert(payload)
       .select(`
-        id, title, price, description, image_url, image_urls, status, quantity, created_at,
+        id, title, price, description, image_url, image_urls, is_used, status, quantity, created_at,
         categories:category_id(id, name),
         users:seller_id(id, name, department, store_name, is_verified, avatar_url, address, user_reviews!user_reviews_seller_id_fkey(rating)),
         reviews(rating)
@@ -19,11 +19,11 @@ class ProductService {
     return this._mapProductRatings(data);
   }
 
-  async getAvailableProducts({ search, categoryId, sort } = {}) {
+  async getAvailableProducts({ search, categoryId, sort, isUsed, priceType } = {}) {
     let query = this.supabase
       .from('products')
       .select(`
-        id, title, price, description, image_url, image_urls, status, quantity, created_at,
+        id, title, price, description, image_url, image_urls, is_used, status, quantity, created_at,
         categories:category_id(id, name),
         users:seller_id(id, name, department, store_name, is_verified, avatar_url, address, user_reviews!user_reviews_seller_id_fkey(rating)),
         reviews(rating)
@@ -34,6 +34,22 @@ class ProductService {
       query = query.eq('category_id', categoryId);
     }
 
+    if (isUsed === true || isUsed === false) {
+      query = query.eq('is_used', isUsed);
+    }
+
+    if (priceType === 'free') {
+      // Handle both 0 and null prices as free
+      query = query.or('price.eq.0,price.is.null');
+    }
+    if (priceType === 'paid') {
+      query = query.gt('price', 0);
+    }
+
+    if (search || categoryId || isUsed !== undefined || priceType) {
+      console.log(`[ProductService] Fetching with filters: search="${search}", cat=${categoryId}, used=${isUsed}, price=${priceType}`);
+    }
+
     if (search) {
       query = query.textSearch('search_vector', search, {
         config: 'english',
@@ -42,14 +58,18 @@ class ProductService {
     }
 
     // --- Dynamic Sorting Logic ---
-    if (sort === 'price_asc') {
+    if (search && (!sort || sort === 'recommended')) {
+      // If searching and no specific sort, prioritize search rank
+      query = query.order('created_at', { ascending: false }); 
+      // Note: Supabase textSearch doesn't easily expose rank for scoring in the same call 
+      // with other complex JS-based scoring. We'll stick to a balanced approach.
+    } else if (sort === 'price_asc') {
       query = query.order('price', { ascending: true });
     } else if (sort === 'price_desc') {
       query = query.order('price', { ascending: false });
     } else if (sort === 'newest') {
       query = query.order('created_at', { ascending: false });
     } else {
-      // 'recommended' or default: fetch then apply smart relevance scoring
       query = query.order('created_at', { ascending: false });
     }
 
@@ -100,7 +120,7 @@ class ProductService {
     const { data, error } = await this.supabase
       .from('products')
       .select(`
-        id, title, price, description, image_url, image_urls, status, quantity, created_at,
+        id, title, price, description, image_url, image_urls, is_used, status, quantity, created_at,
         categories:category_id(id, name),
         users:seller_id(id, name, department, store_name, is_verified, avatar_url, phone, address, user_reviews!user_reviews_seller_id_fkey(rating)),
         reviews(rating)
@@ -123,7 +143,7 @@ class ProductService {
     const { data, error } = await this.supabase
       .from('products')
       .select(`
-        id, title, price, image_url, image_urls, status, created_at,
+        id, title, price, image_url, image_urls, is_used, status, created_at,
         categories:category_id(id, name)
       `)
       .eq('seller_id', sellerId)
@@ -138,7 +158,7 @@ class ProductService {
     const { data, error } = await this.supabase
       .from('products')
       .select(`
-        id, title, price, image_url, image_urls, status, quantity, created_at,
+        id, title, price, image_url, image_urls, is_used, status, quantity, created_at,
         categories:category_id(id, name)
       `)
       .eq('seller_id', sellerId)
@@ -172,7 +192,7 @@ class ProductService {
       .update(updates)
       .eq('id', productId)
       .select(`
-        id, title, price, description, image_url, image_urls, status, quantity, created_at,
+        id, title, price, description, image_url, image_urls, is_used, status, quantity, created_at,
         categories:category_id(id, name),
         users:seller_id(id, name, department, store_name, is_verified, avatar_url, address, user_reviews!user_reviews_seller_id_fkey(rating)),
         reviews(rating)

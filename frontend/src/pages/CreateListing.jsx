@@ -4,6 +4,7 @@ import { Link } from 'react-router-dom';
 import { FaCloudUploadAlt, FaSpinner, FaCheckCircle, FaLink, FaImage, FaTimes } from 'react-icons/fa';
 import { createListing, fetchCategories, fetchMyProducts, uploadImage } from '../utils/api';
 import { useAuth } from '../context/AuthContext';
+import ImageWithFallback from '../components/ImageWithFallback';
 
 function CreateListing() {
   const [form, setForm] = useState({
@@ -12,6 +13,7 @@ function CreateListing() {
     quantity: 1,
     description: '',
     category_id: '',
+    is_used: false,
   });
   const [isFree, setIsFree] = useState(false);
   const [categories, setCategories] = useState([]);
@@ -24,6 +26,7 @@ function CreateListing() {
   const [dragging, setDragging] = useState(false);
   const [myProducts, setMyProducts] = useState([]);
   const [loadingProducts, setLoadingProducts] = useState(false);
+  const [toast, setToast] = useState({ open: false, link: '', copied: false, productId: null });
   const fileInputRef = useRef(null);
   const { isAuthenticated, loading, user } = useAuth();
   const navigate = useNavigate();
@@ -62,9 +65,18 @@ function CreateListing() {
     loadMyProducts();
   }, [isAuthenticated, user?.id]);
 
+  useEffect(() => {
+    if (!toast.open) return;
+    const timer = setTimeout(() => {
+      setToast((prev) => ({ ...prev, open: false, copied: false }));
+    }, 10000);
+    return () => clearTimeout(timer);
+  }, [toast.open]);
+
   function handleChange(e) {
-    const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
+    const { name, value, type, checked } = e.target;
+    const nextValue = type === 'checkbox' ? checked : value;
+    setForm((prev) => ({ ...prev, [name]: nextValue }));
     if (name === 'price') {
       const numericValue = Number(value);
       if (!Number.isNaN(numericValue) && numericValue > 0) {
@@ -146,20 +158,25 @@ function CreateListing() {
 
     try {
       setSubmitting(true);
-      await createListing({
+      const created = await createListing({
         ...form,
         image_urls: imageUrls,
         price: isFree ? 0 : Number(form.price),
         quantity: Math.max(1, Number(form.quantity) || 1),
         category_id: Number(form.category_id),
       });
-      setMessage({ type: 'success', text: 'Listing published successfully!' });
-      setForm({ title: '', price: '', quantity: 1, description: '', category_id: '' });
+      const createdId = created?.data?.id;
+      if (createdId) {
+        const shareLink = `${window.location.origin}/product/${createdId}`;
+        setToast({ open: true, link: shareLink, copied: false, productId: createdId });
+      }
+      setMessage({ type: '', text: '' });
+      setForm({ title: '', price: '', quantity: 1, description: '', category_id: '', is_used: false });
       setIsFree(false);
       setImageUrls([]);
       setImageInputUrl('');
-      const payload = await fetchMyProducts();
-      setMyProducts(payload.data || []);
+      const productPayload = await fetchMyProducts();
+      setMyProducts(productPayload.data || []);
     } catch (error) {
       setMessage({ type: 'error', text: error.message });
     } finally {
@@ -181,8 +198,66 @@ function CreateListing() {
     transition: 'all 0.2s ease',
   };
 
+  const imageFallback = 'https://placehold.co/300x200/e5e7eb/9ca3af?text=No+Image';
+
+  async function handleCopyLink() {
+    if (!toast.link) return;
+    try {
+      if (navigator?.clipboard?.writeText) {
+        await navigator.clipboard.writeText(toast.link);
+      } else {
+        const tempInput = document.createElement('input');
+        tempInput.value = toast.link;
+        document.body.appendChild(tempInput);
+        tempInput.select();
+        document.execCommand('copy');
+        document.body.removeChild(tempInput);
+      }
+      setToast((prev) => ({ ...prev, copied: true }));
+    } catch {
+      setToast((prev) => ({ ...prev, copied: false }));
+    }
+  }
+
   return (
     <div className="create-listing-page">
+      {toast.open && (
+        <div className="toast toast-success">
+          <div className="toast-header">
+            <span className="toast-title">
+              <FaCheckCircle /> Live now
+            </span>
+            <button
+              type="button"
+              className="toast-close"
+              onClick={() => setToast((prev) => ({ ...prev, open: false }))}
+              aria-label="Close"
+            >
+              <FaTimes />
+            </button>
+          </div>
+          <p className="toast-text">Your listing is live in the marketplace.</p>
+          <div className="toast-actions">
+            <input
+              className="input toast-input"
+              readOnly
+              value={toast.link}
+              onFocus={(e) => e.target.select()}
+            />
+            <div className="toast-buttons">
+              <button type="button" className="btn btn-outline" onClick={handleCopyLink}>
+                <FaLink /> Copy link
+              </button>
+              {toast.productId && (
+                <Link to={`/product/${toast.productId}`} className="btn btn-primary">
+                  View listing
+                </Link>
+              )}
+            </div>
+            {toast.copied && <span className="toast-note">Link copied</span>}
+          </div>
+        </div>
+      )}
       <div className="container">
         <div className="create-listing-card fade-in-up">
           <h1>Create a Listing</h1>
@@ -242,6 +317,18 @@ function CreateListing() {
                 />
                 <label htmlFor="freeItem" style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-gray-600)' }}>
                   Mark this item as free
+                </label>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
+                <input
+                  id="usedItem"
+                  name="is_used"
+                  type="checkbox"
+                  checked={Boolean(form.is_used)}
+                  onChange={handleChange}
+                />
+                <label htmlFor="usedItem" style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-gray-600)' }}>
+                  Mark as used
                 </label>
               </div>
             </div>
@@ -458,8 +545,17 @@ function CreateListing() {
               </div>
             </div>
             {loadingProducts ? (
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--color-gray-500)' }}>
-                <FaSpinner className="spinner" /> Loading your listings...
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 'var(--space-4)' }}>
+                {[1, 2, 3].map((n) => (
+                  <div key={n} className="skeleton-card">
+                    <div className="skeleton-image skeleton" />
+                    <div className="skeleton-body">
+                      <div className="skeleton-line skeleton skeleton-line-medium" />
+                      <div className="skeleton-line skeleton skeleton-line-short" />
+                      <div className="skeleton-line skeleton skeleton-line-short" />
+                    </div>
+                  </div>
+                ))}
               </div>
             ) : myProducts.length === 0 ? (
               <p style={{ color: 'var(--color-gray-500)' }}>You have no listings yet.</p>
@@ -469,11 +565,12 @@ function CreateListing() {
                   const cover = p.image_urls?.[0] || p.image_url;
                   return (
                     <div key={p.id} style={{ border: '1px solid var(--color-gray-100)', borderRadius: 'var(--radius-lg)', overflow: 'hidden', background: 'var(--color-white)' }}>
-                      <img
-                        src={cover || 'https://placehold.co/300x200/e5e7eb/9ca3af?text=No+Image'}
+                      <ImageWithFallback
+                        src={cover}
                         alt={p.title}
-                        style={{ width: '100%', height: 140, objectFit: 'cover', display: 'block' }}
-                        onError={(e) => { e.target.src = 'https://placehold.co/300x200/e5e7eb/9ca3af?text=No+Image'; }}
+                        fallbackSrc={imageFallback}
+                        wrapperStyle={{ width: '100%', height: 140 }}
+                        imgStyle={{ objectFit: 'cover' }}
                       />
                       <div style={{ padding: 'var(--space-3)' }}>
                         <p style={{ fontWeight: 600, fontSize: 'var(--font-size-sm)', marginBottom: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -481,6 +578,9 @@ function CreateListing() {
                         </p>
                         <p style={{ fontWeight: 700, color: 'var(--color-primary)', fontSize: 'var(--font-size-sm)', marginBottom: 8 }}>
                           {Number(p.price) === 0 ? 'Free' : `₦${Number(p.price).toLocaleString()}`}
+                        </p>
+                        <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-gray-500)', marginBottom: 8 }}>
+                          Condition: {p.is_used ? 'Used' : 'New'}
                         </p>
                         <Link
                           to={`/listings/${p.id}/edit`}

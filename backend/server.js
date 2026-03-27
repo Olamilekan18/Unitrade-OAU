@@ -822,6 +822,7 @@ app.get('/api/orders/check-purchase/:productId', verifyJwt, async (req, res, nex
 });
 
 // ── User Reviews ──
+app.get('/api/users/:userId/reviews', UserReviewController.getUserReviews);
 app.post('/api/users/:userId/reviews', verifyJwt, UserReviewController.createUserReview);
 
 app.post('/api/orders/verify-payment', verifyJwt, async (req, res, next) => {

@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { FaArrowLeft, FaSpinner } from 'react-icons/fa';
+import { FaArrowLeft } from 'react-icons/fa';
 import { fetchMyProducts } from '../utils/api';
 import { useAuth } from '../context/AuthContext';
+import ImageWithFallback from '../components/ImageWithFallback';
 
 function MyListings() {
   const { isAuthenticated, loading } = useAuth();
@@ -35,6 +36,8 @@ function MyListings() {
 
   if (loading) return null;
 
+  const imageFallback = 'https://placehold.co/300x200/e5e7eb/9ca3af?text=No+Image';
+
   return (
     <div className="create-listing-page">
       <div className="container">
@@ -52,8 +55,17 @@ function MyListings() {
           )}
 
           {loadingProducts ? (
-            <div style={{ display: 'flex', alignItems: 'center', gap: 8, color: 'var(--color-gray-500)' }}>
-              <FaSpinner className="spinner" /> Loading...
+            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(200px, 1fr))', gap: 'var(--space-4)' }}>
+              {[1, 2, 3, 4].map((n) => (
+                <div key={n} className="skeleton-card">
+                  <div className="skeleton-image skeleton" />
+                  <div className="skeleton-body">
+                    <div className="skeleton-line skeleton skeleton-line-medium" />
+                    <div className="skeleton-line skeleton skeleton-line-short" />
+                    <div className="skeleton-line skeleton skeleton-line-short" />
+                  </div>
+                </div>
+              ))}
             </div>
           ) : products.length === 0 ? (
             <p style={{ color: 'var(--color-gray-500)' }}>You have no listings yet.</p>
@@ -63,11 +75,12 @@ function MyListings() {
                 const cover = p.image_urls?.[0] || p.image_url;
                 return (
                   <div key={p.id} style={{ border: '1px solid var(--color-gray-100)', borderRadius: 'var(--radius-lg)', overflow: 'hidden', background: 'var(--color-white)' }}>
-                    <img
-                      src={cover || 'https://placehold.co/300x200/e5e7eb/9ca3af?text=No+Image'}
+                    <ImageWithFallback
+                      src={cover}
                       alt={p.title}
-                      style={{ width: '100%', height: 150, objectFit: 'cover', display: 'block' }}
-                      onError={(e) => { e.target.src = 'https://placehold.co/300x200/e5e7eb/9ca3af?text=No+Image'; }}
+                      fallbackSrc={imageFallback}
+                      wrapperStyle={{ width: '100%', height: 150 }}
+                      imgStyle={{ objectFit: 'cover' }}
                     />
                     <div style={{ padding: 'var(--space-3)' }}>
                       <p style={{ fontWeight: 600, fontSize: 'var(--font-size-sm)', marginBottom: 6, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
@@ -75,6 +88,9 @@ function MyListings() {
                       </p>
                       <p style={{ fontWeight: 700, color: 'var(--color-primary)', fontSize: 'var(--font-size-sm)', marginBottom: 8 }}>
                         {Number(p.price) === 0 ? 'Free' : `₦${Number(p.price).toLocaleString()}`}
+                      </p>
+                      <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-gray-500)', marginBottom: 8 }}>
+                        Condition: {p.is_used ? 'Used' : 'New'}
                       </p>
                       <div style={{ display: 'flex', gap: 8 }}>
                         <Link

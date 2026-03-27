@@ -3,8 +3,9 @@ import { useParams, Link } from 'react-router-dom';
 import {
     FaBuilding, FaPhone, FaMapMarkerAlt, FaCheckCircle,
     FaSpinner, FaArrowLeft, FaStore, FaCalendarAlt, FaFlag,
+    FaStar, FaRegStar,
 } from 'react-icons/fa';
-import { getProfile, fetchSellerProducts, reportUser } from '../utils/api';
+import { getProfile, fetchSellerProducts, reportUser, fetchUserReviews } from '../utils/api';
 import { useAuth } from '../context/AuthContext';
 
 function UserProfilePage() {
@@ -12,6 +13,8 @@ function UserProfilePage() {
     const { user } = useAuth();
     const [profile, setProfile] = useState(null);
     const [products, setProducts] = useState([]);
+    const [reviews, setReviews] = useState([]);
+    const [stats, setStats] = useState({ average: 0, count: 0 });
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState('');
 
@@ -19,12 +22,15 @@ function UserProfilePage() {
         async function loadProfile() {
             try {
                 setLoading(true);
-                const [profileRes, productsRes] = await Promise.all([
+                const [profileRes, productsRes, reviewsRes] = await Promise.all([
                     getProfile(id),
                     fetchSellerProducts(id),
+                    fetchUserReviews(id),
                 ]);
                 setProfile(profileRes.data);
                 setProducts(productsRes.data || []);
+                setReviews(reviewsRes.data.reviews || []);
+                setStats(reviewsRes.data.stats || { average: 0, count: 0 });
             } catch (err) {
                 setError(err.message);
             } finally {
@@ -99,16 +105,9 @@ function UserProfilePage() {
                             )}
                         </div>
 
-                        {user?.id && user.id !== profile.id && (
-                            <button
-                                type="button"
-                                onClick={handleReportAccount}
-                                className="btn btn-outline"
-                                style={{ marginTop: 'var(--space-3)', fontSize: '0.85rem' }}
-                            >
-                                <FaFlag /> Report Account
-                            </button>
-                        )}
+                        <Link to="/marketplace" className="btn btn-outline" style={{ marginTop: 'var(--space-3)', fontSize: '0.85rem' }}>
+                            <FaArrowLeft /> Back to Marketplace
+                        </Link>
 
                         {profile.store_name && (
                             <p style={{ color: 'var(--color-gray-500)', fontSize: 'var(--font-size-sm)' }}>{profile.name}</p>
@@ -142,22 +141,23 @@ function UserProfilePage() {
 
                         {/* Seller's Products */}
                         {products.length > 0 && (
-                            <div style={{ marginTop: 'var(--space-4)' }}>
+                            <div style={{ marginTop: 'var(--space-6)', borderTop: '1px solid var(--color-gray-100)', paddingTop: 'var(--space-6)' }}>
                                 <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 700, marginBottom: 'var(--space-4)' }}>
-                                    Listings ({products.length})
+                                    Active Listings ({products.length})
                                 </h3>
-                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 'var(--space-3)' }}>
+                                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(180px, 1fr))', gap: 'var(--space-4)' }}>
                                     {products.map((p) => (
                                         <Link
                                             key={p.id}
                                             to={`/product/${p.id}`}
-                                            style={{ textDecoration: 'none', color: 'inherit', borderRadius: 'var(--radius-lg)', overflow: 'hidden', border: '1px solid var(--color-gray-100)', transition: 'box-shadow 0.2s' }}
+                                            className="seller-product-item"
+                                            style={{ textDecoration: 'none', color: 'inherit', borderRadius: 'var(--radius-lg)', overflow: 'hidden', border: '1px solid var(--color-gray-100)', transition: 'all 0.2s', background: 'var(--color-white)' }}
                                         >
                                             <img
                                                 src={p.image_url}
                                                 alt={p.title}
-                                                style={{ width: '100%', height: 120, objectFit: 'cover' }}
-                                                onError={(e) => { e.target.src = 'https://placehold.co/200x120/e5e7eb/9ca3af?text=No+Image'; }}
+                                                style={{ width: '100%', height: 130, objectFit: 'cover' }}
+                                                onError={(e) => { e.target.src = 'https://placehold.co/200x130/e5e7eb/9ca3af?text=No+Image'; }}
                                             />
                                             <div style={{ padding: 'var(--space-3)' }}>
                                                 <p style={{ fontWeight: 600, fontSize: 'var(--font-size-sm)', marginBottom: 4, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{p.title}</p>
@@ -171,11 +171,44 @@ function UserProfilePage() {
                             </div>
                         )}
 
-                        <div style={{ textAlign: 'center', marginTop: 'var(--space-4, 1rem)' }}>
-                            <Link to="/marketplace" className="btn btn-lg btn-outline">
-                                <FaArrowLeft /> Back to Marketplace
-                            </Link>
+                        {/* Seller's Reviews */}
+                        <div style={{ marginTop: 'var(--space-8)', borderTop: '1px solid var(--color-gray-100)', paddingTop: 'var(--space-6)' }}>
+                            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 'var(--space-4)' }}>
+                                <h3 style={{ fontSize: 'var(--font-size-lg)', fontWeight: 700 }}>
+                                    Seller Reviews
+                                </h3>
+                                {stats.count > 0 && (
+                                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                                        <RatingStars value={stats.average} />
+                                        <span style={{ fontWeight: 700, fontSize: 'var(--font-size-sm)' }}>{stats.average}</span>
+                                        <span style={{ color: 'var(--color-gray-400)', fontSize: 'var(--font-size-xs)' }}>({stats.count})</span>
+                                    </div>
+                                )}
+                            </div>
+
+                            {reviews.length === 0 ? (
+                                <p style={{ color: 'var(--color-gray-400)', fontSize: 'var(--font-size-sm)', textAlign: 'center', padding: 'var(--space-4)' }}>
+                                    No reviews yet for this seller.
+                                </p>
+                            ) : (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-4)' }}>
+                                    {reviews.map((review) => (
+                                        <ReviewCard key={review.id} review={review} />
+                                    ))}
+                                </div>
+                            )}
                         </div>
+
+                        {user?.id && user.id !== profile.id && (
+                            <button
+                                type="button"
+                                onClick={handleReportAccount}
+                                className="btn btn-lg btn-outline"
+                                style={{ width: '100%', marginTop: 'var(--space-4)' }}
+                            >
+                                <FaFlag /> Report Account
+                            </button>
+                        )}
                     </div>
                 </div>
             </div>
@@ -193,6 +226,52 @@ function ProfileField({ icon, label, value }) {
             </div>
         </div>
     );
+}
+
+function ReviewCard({ review }) {
+    const reviewer = review.users || {};
+    const defaultAvatar = `https://ui-avatars.com/api/?name=${encodeURIComponent(reviewer.name || '?')}&background=059669&color=fff&size=32`;
+
+    return (
+        <div style={{ padding: 'var(--space-4)', background: 'var(--color-gray-50)', borderRadius: 'var(--radius-md)' }}>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 8 }}>
+                <img
+                    src={reviewer.avatar_url || defaultAvatar}
+                    alt={reviewer.name}
+                    style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover' }}
+                    onError={(e) => { e.target.src = defaultAvatar; }}
+                />
+                <div style={{ flex: 1 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                        <span style={{ fontWeight: 600, fontSize: 'var(--font-size-sm)' }}>
+                            {reviewer.store_name || reviewer.name}
+                        </span>
+                        <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-gray-400)' }}>
+                            {new Date(review.created_at).toLocaleDateString()}
+                        </span>
+                    </div>
+                    <RatingStars value={review.rating} />
+                </div>
+            </div>
+            {review.comment && (
+                <p style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-gray-600)', lineHeight: 1.5 }}>
+                    {review.comment}
+                </p>
+            )}
+        </div>
+    );
+}
+
+function RatingStars({ value }) {
+    const stars = [];
+    for (let i = 1; i <= 5; i++) {
+        stars.push(
+            i <= Math.round(value)
+                ? <FaStar key={i} style={{ color: '#f59e0b', fontSize: '0.8rem' }} />
+                : <FaRegStar key={i} style={{ color: 'var(--color-gray-300)', fontSize: '0.8rem' }} />
+        );
+    }
+    return <div style={{ display: 'flex', gap: 2 }}>{stars}</div>;
 }
 
 export default UserProfilePage;

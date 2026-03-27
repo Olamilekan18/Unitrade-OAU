@@ -49,6 +49,36 @@ class UserReviewService {
 
     return data;
   }
+
+  async getUserReviews(userId) {
+    const { data, error } = await this.supabase
+      .from('user_reviews')
+      .select(`
+        id, rating, comment, created_at,
+        users:reviewer_id(id, name, avatar_url, store_name, is_verified)
+      `)
+      .eq('seller_id', userId)
+      .order('created_at', { ascending: false });
+
+    if (error) throw error;
+    return data;
+  }
+
+  async getUserStats(userId) {
+    const { data, error } = await this.supabase
+      .from('user_reviews')
+      .select('rating')
+      .eq('seller_id', userId);
+
+    if (error) throw error;
+
+    const count = data.length;
+    const average = count > 0 
+      ? Math.round((data.reduce((sum, r) => sum + r.rating, 0) / count) * 10) / 10 
+      : 0;
+
+    return { average, count };
+  }
 }
 
 module.exports = UserReviewService;

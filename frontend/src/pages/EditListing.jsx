@@ -16,6 +16,7 @@ function EditListing() {
     quantity: 1,
     description: '',
     category_id: '',
+    is_used: false,
   });
   const [imageUrls, setImageUrls] = useState([]);
   const [imageInputUrl, setImageInputUrl] = useState('');
@@ -63,6 +64,7 @@ function EditListing() {
           quantity: listing.quantity ?? 1,
           description: listing.description || '',
           category_id: listing.categories?.id || listing.category_id || '',
+          is_used: Boolean(listing.is_used),
         });
         const images = listing.image_urls?.length ? listing.image_urls : listing.image_url ? [listing.image_url] : [];
         setImageUrls(images);
@@ -77,8 +79,9 @@ function EditListing() {
   }, [id, isAuthenticated, user?.id]);
 
   function handleChange(e) {
-    const { name, value } = e.target;
-    setForm((prev) => ({ ...prev, [name]: value }));
+    const { name, value, type, checked } = e.target;
+    const nextValue = type === 'checkbox' ? checked : value;
+    setForm((prev) => ({ ...prev, [name]: nextValue }));
     if (name === 'price') {
       const numericValue = Number(value);
       if (!Number.isNaN(numericValue) && numericValue > 0) {
@@ -253,6 +256,18 @@ function EditListing() {
                 />
                 <label htmlFor="freeItem" style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-gray-600)' }}>
                   Mark this item as free
+                </label>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 8 }}>
+                <input
+                  id="usedItem"
+                  name="is_used"
+                  type="checkbox"
+                  checked={Boolean(form.is_used)}
+                  onChange={handleChange}
+                />
+                <label htmlFor="usedItem" style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-gray-600)' }}>
+                  Mark as used
                 </label>
               </div>
             </div>
