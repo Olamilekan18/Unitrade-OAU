@@ -30,6 +30,7 @@ const productValidation = [
   body('image_url').optional({ checkFalsy: true }).isURL().withMessage('Must be a valid URL'),
   body('image_urls').optional({ checkFalsy: true }).isArray({ min: 1, max: 3 }).withMessage('You can upload up to 3 images'),
   body('image_urls.*').optional({ checkFalsy: true }).isURL().withMessage('Must be a valid URL'),
+  body('is_used').optional().isBoolean().withMessage('Used flag must be true or false'),
   body().custom((_, { req }) => {
     const urls = req.body.image_urls;
     const singleUrl = req.body.image_url;
@@ -50,9 +51,10 @@ const productUpdateValidation = [
   body('image_url').optional({ checkFalsy: true }).isURL().withMessage('Must be a valid URL'),
   body('image_urls').optional({ checkFalsy: true }).isArray({ min: 1, max: 3 }).withMessage('You can upload up to 3 images'),
   body('image_urls.*').optional({ checkFalsy: true }).isURL().withMessage('Must be a valid URL'),
+  body('is_used').optional().isBoolean().withMessage('Used flag must be true or false'),
   body('quantity').optional({ checkFalsy: true }).isInt({ min: 1 }).withMessage('Quantity must be at least 1'),
   body().custom((_, { req }) => {
-    const fields = ['title', 'price', 'description', 'category_id', 'image_url', 'image_urls', 'quantity'];
+    const fields = ['title', 'price', 'description', 'category_id', 'image_url', 'image_urls', 'quantity', 'is_used'];
     const hasAny = fields.some((field) => req.body[field] !== undefined);
     if (!hasAny) {
       throw new Error('Provide at least one field to update');

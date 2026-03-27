@@ -160,6 +160,10 @@ export async function createUserReview(userId, data) {
   });
 }
 
+export async function fetchUserReviews(userId) {
+  return apiFetch(`/users/${userId}/reviews`);
+}
+
 /* ── Verification ── */
 export async function requestVerification(payload) {
   return apiFetch('/verification-requests', {

@@ -8,7 +8,7 @@ const auditService = new AuditService(supabase);
 class ProductController {
   static async createProduct(req, res, next) {
     try {
-      const { title, price, description, category_id, image_url, image_urls, quantity } = req.body;
+      const { title, price, description, category_id, image_url, image_urls, quantity, is_used } = req.body;
 
       const images = Array.isArray(image_urls) && image_urls.length
         ? image_urls.filter(Boolean)
@@ -34,6 +34,7 @@ class ProductController {
         category_id,
         image_url: images[0],
         image_urls: images,
+        is_used: Boolean(is_used),
         quantity: quantity || 1,
         seller_id: req.user.id,
         status: 'available'
@@ -54,11 +55,22 @@ class ProductController {
 
   static async getProducts(req, res, next) {
     try {
-      const { q, category, sort } = req.query;
+      console.log('[ProductController] GET /products', req.query);
+      const { q, category, sort, condition, is_used, price_type } = req.query;
+      let isUsedFilter;
+      if (condition === 'used') isUsedFilter = true;
+      if (condition === 'new') isUsedFilter = false;
+      if (is_used === 'true') isUsedFilter = true;
+      if (is_used === 'false') isUsedFilter = false;
+      let priceType;
+      if (price_type === 'free') priceType = 'free';
+      if (price_type === 'paid') priceType = 'paid';
       const products = await productService.getAvailableProducts({
         search: q,
         categoryId: category,
-        sort: sort
+        sort: sort,
+        isUsed: isUsedFilter,
+        priceType
       });
       res.json({ success: true, data: products });
     } catch (error) {
@@ -95,7 +107,7 @@ class ProductController {
 
   static async updateProduct(req, res, next) {
     try {
-      const { title, price, description, category_id, image_url, image_urls, quantity } = req.body;
+      const { title, price, description, category_id, image_url, image_urls, quantity, is_used } = req.body;
 
       let images = null;
       if (Array.isArray(image_urls)) {
@@ -116,6 +128,7 @@ class ProductController {
       if (description !== undefined) updates.description = description;
       if (category_id !== undefined) updates.category_id = category_id;
       if (quantity !== undefined) updates.quantity = quantity;
+      if (is_used !== undefined) updates.is_used = Boolean(is_used);
       if (images) {
         if (!images.length) {
           const err = new Error('At least one product image is required.');

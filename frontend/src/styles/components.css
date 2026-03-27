@@ -243,6 +243,127 @@ select.input {
     }
 }
 
+/* ── Image Placeholder ── */
+.image-wrapper {
+    position: relative;
+    overflow: hidden;
+    background: var(--color-gray-100);
+    width: 100%;
+    height: 100%;
+}
+
+.image-skeleton {
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, var(--color-gray-200) 25%, var(--color-gray-100) 50%, var(--color-gray-200) 75%);
+    background-size: 200% 100%;
+    animation: shimmer 1.5s infinite;
+    transition: opacity 0.3s ease;
+    z-index: 0;
+    pointer-events: none;
+}
+
+.image-main {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+    position: relative;
+    z-index: 1;
+}
+
+.image-main.loaded {
+    opacity: 1;
+}
+
+.image-wrapper.loaded .image-skeleton {
+    opacity: 0;
+    visibility: hidden;
+    animation: none;
+}
+
+.image-wrapper.loaded {
+    background: transparent;
+}
+
+/* ── Toast ── */
+.toast {
+    position: fixed;
+    right: var(--space-6);
+    bottom: var(--space-6);
+    max-width: 420px;
+    width: min(90vw, 420px);
+    background: var(--color-white);
+    border-radius: var(--radius-lg);
+    box-shadow: var(--shadow-xl);
+    border: 1px solid var(--color-gray-100);
+    padding: var(--space-4);
+    z-index: 200;
+    display: grid;
+    gap: var(--space-3);
+}
+
+.toast-success {
+    border-color: var(--color-primary-100);
+}
+
+.toast-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: var(--space-3);
+}
+
+.toast-title {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    font-weight: 700;
+    color: var(--color-primary-dark);
+}
+
+.toast-close {
+    background: transparent;
+    border: none;
+    color: var(--color-gray-500);
+    cursor: pointer;
+    font-size: 1rem;
+    padding: 4px;
+}
+
+.toast-text {
+    color: var(--color-gray-600);
+    font-size: var(--font-size-sm);
+}
+
+.toast-actions {
+    display: grid;
+    gap: var(--space-2);
+}
+
+.toast-input {
+    font-size: var(--font-size-xs);
+}
+
+.toast-buttons {
+    display: flex;
+    gap: var(--space-2);
+    flex-wrap: wrap;
+}
+
+.toast-note {
+    font-size: var(--font-size-xs);
+    color: var(--color-primary-dark);
+}
+
+@media (max-width: 640px) {
+    .toast {
+        right: var(--space-4);
+        left: var(--space-4);
+        width: auto;
+    }
+}
+
 /* ── Fade In Animation ── */
 @keyframes fadeInUp {
     from {

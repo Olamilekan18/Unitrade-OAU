@@ -7,6 +7,7 @@ import {
 } from 'react-icons/fa';
 import { fetchProduct, fetchReviews, createReview, createOrder, verifyPayment, checkPurchase, fetchBidCount, createBid, fetchMyBid, updateBid } from '../utils/api';
 import { useAuth } from '../context/AuthContext';
+import ImageWithFallback from '../components/ImageWithFallback';
 
 const PAYSTACK_PUBLIC_KEY = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY;
 
@@ -283,11 +284,14 @@ function ProductDetailPage() {
     const isSeller = isAuthenticated && seller.id === user?.id;
     const isSold = product.status === 'sold' || product.quantity <= 0;
     const isFreeItem = Number(product.price) === 0;
+    const isUsedItem = Boolean(product.is_used);
     const canBuy = isAuthenticated && !isSeller && !isSold && !hasPurchased && product.quantity > 0;
     const canReview = isAuthenticated && !isSeller && hasPurchased && purchaseChecked;
     const canBid = isAuthenticated && !isSeller && !isSold && isFreeItem && product.quantity > 0;
     const canEditBid = canBid && myBid && myBid.status === 'pending';
     const canChatForFree = isFreeItem && myBid?.status === 'accepted';
+
+    const imageFallback = 'https://placehold.co/600x400/e5e7eb/9ca3af?text=No+Image';
 
     const imageGallery = product.image_urls?.length
         ? product.image_urls
@@ -317,11 +321,12 @@ function ProductDetailPage() {
                     <div className="fade-in-up" style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(320px, 1fr))', gap: 'var(--space-8)', background: 'white', borderRadius: 'var(--radius-xl)', boxShadow: 'var(--shadow-md)', overflow: 'hidden' }}>
                         {/* Image */}
                         <div style={{ position: 'relative', minHeight: 320 }}>
-                            <img
+                            <ImageWithFallback
                                 src={activeImage || product.image_url}
                                 alt={product.title}
-                                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block', minHeight: 320 }}
-                                onError={(e) => { e.target.src = 'https://placehold.co/600x400/e5e7eb/9ca3af?text=No+Image'; }}
+                                fallbackSrc={imageFallback}
+                                wrapperStyle={{ width: '100%', height: '100%', minHeight: 320 }}
+                                imgStyle={{ objectFit: 'cover' }}
                             />
                             <span
                                 className="badge badge-accent"
@@ -370,10 +375,12 @@ function ProductDetailPage() {
                                                 cursor: 'pointer',
                                             }}
                                         >
-                                            <img
+                                            <ImageWithFallback
                                                 src={url}
                                                 alt={`Thumbnail ${idx + 1}`}
-                                                style={{ width: '100%', height: '100%', objectFit: 'cover', display: 'block' }}
+                                                fallbackSrc={imageFallback}
+                                                wrapperStyle={{ width: '100%', height: '100%' }}
+                                                imgStyle={{ objectFit: 'cover' }}
                                             />
                                         </button>
                                     ))}
@@ -401,8 +408,18 @@ function ProductDetailPage() {
                                 {isFreeItem ? 'Free' : `₦${Number(product.price).toLocaleString()}`}
                             </p>
 
+                            <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>
+                                {isFreeItem && <span className="badge badge-primary">Free</span>}
+                                {isUsedItem && <span className="badge badge-accent">Used</span>}
+                                {!isFreeItem && !isUsedItem && <span className="badge badge-accent">New</span>}
+                            </div>
+
                             <div style={{ display: 'inline-block', fontSize: 'var(--font-size-sm)', fontWeight: 600, padding: '4px 8px', borderRadius: '4px', background: isSold ? '#fee2e2' : 'var(--color-primary-50)', color: isSold ? '#991b1b' : 'var(--color-primary-dark)', width: 'fit-content' }}>
                                 {isSold ? 'Out of Stock' : `${product.quantity} in stock`}
+                            </div>
+
+                            <div style={{ fontSize: 'var(--font-size-sm)', color: 'var(--color-gray-500)' }}>
+                                Condition: <strong style={{ color: 'var(--color-gray-700)' }}>{isUsedItem ? 'Used' : 'New'}</strong>
                             </div>
 
                             {isFreeItem && (
@@ -431,18 +448,24 @@ function ProductDetailPage() {
                                 <FaClock /> Listed {timeAgo}
                             </div>
 
-                            {/* Buy Now Button */}
                             {canBuy && !isFreeItem && (
-                                <button
-                                    className="btn btn-lg buy-now-btn"
-                                    onClick={handleBuyNow}
-                                    disabled={buying}
-                                    style={{ marginTop: 'var(--space-2)' }}
-                                >
-                                    {buying
-                                        ? <><FaSpinner className="spinner" /> Processing...</>
-                                        : <><FaShoppingCart /> Buy Now — ₦{Number(product.price).toLocaleString()}</>}
-                                </button>
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--space-2)', marginTop: 'var(--space-2)' }}>
+                                    <button
+                                        className="btn btn-lg buy-now-btn"
+                                        onClick={handleBuyNow}
+                                        disabled={buying}
+                                    >
+                                        {buying
+                                            ? <><FaSpinner className="spinner" /> Processing...</>
+                                            : <><FaShoppingCart /> Buy Now — ₦{Number(product.price).toLocaleString()}</>}
+                                    </button>
+                                    <Link
+                                        to={`/chat?seller=${seller.id}&product=${product.id}&action=offer`}
+                                        className="btn btn-lg btn-outline"
+                                    >
+                                        <FaCommentDots /> Make Offer
+                                    </Link>
+                                </div>
                             )}
 
                             {canBid && (
@@ -542,46 +565,61 @@ function ProductDetailPage() {
                             )}
 
                             {/* Seller Card */}
-                            <div style={{ marginTop: 'auto', padding: 'var(--space-4)', background: 'var(--color-gray-50)', borderRadius: 'var(--radius-lg)', display: 'flex', alignItems: 'center', gap: 'var(--space-3)' }}>
-                                <img
-                                    src={seller.avatar_url || defaultAvatar}
-                                    alt={seller.name}
-                                    style={{ width: 48, height: 48, borderRadius: '50%', objectFit: 'cover' }}
-                                    onError={(e) => { e.target.src = defaultAvatar; }}
-                                />
-                                <div style={{ flex: 1 }}>
+                            <div style={{ marginTop: 'auto', padding: 'var(--space-5)', background: 'var(--color-gray-50)', borderRadius: 'var(--radius-xl)', border: '1px solid var(--color-gray-100)' }}>
+                                <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-4)', marginBottom: 'var(--space-5)' }}>
+                                    <ImageWithFallback
+                                        src={seller.avatar_url}
+                                        alt={seller.name}
+                                        fallbackSrc={defaultAvatar}
+                                        wrapperStyle={{ width: 56, height: 56, borderRadius: '50%', border: '2px solid white', boxShadow: 'var(--shadow-sm)' }}
+                                        imgStyle={{ objectFit: 'cover' }}
+                                    />
+                                    <div style={{ flex: 1 }}>
+                                        <Link
+                                            to={`/users/${seller.id}`}
+                                            style={{ fontWeight: 700, color: 'var(--color-gray-900)', fontSize: 'var(--font-size-lg)', display: 'flex', alignItems: 'center', gap: 6, textDecoration: 'none' }}
+                                        >
+                                            {seller.store_name || seller.name}
+                                            {seller.is_verified && (
+                                                <FaCheckCircle style={{ color: '#1d9bf0', fontSize: '1rem' }} title="Verified Seller" />
+                                            )}
+                                        </Link>
+                                        <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginTop: 4 }}>
+                                            {seller.seller_rating && (
+                                                <span style={{ color: 'var(--color-gray-600)', fontSize: 'var(--font-size-sm)', display: 'flex', alignItems: 'center', gap: 4, fontWeight: 600 }}>
+                                                    <FaStar color="#f59e0b" /> {seller.seller_rating} ({seller.seller_reviews_count})
+                                                </span>
+                                            )}
+                                            <span style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-gray-500)', display: 'flex', alignItems: 'center', gap: 4 }}>
+                                                <FaMapMarkerAlt /> {seller.department}
+                                            </span>
+                                        </div>
+                                    </div>
+                                </div>
+                                
+                                <div style={{ display: 'flex', gap: 'var(--space-2)', flexWrap: 'wrap' }}>
                                     <Link
                                         to={`/users/${seller.id}`}
-                                        style={{ fontWeight: 700, color: 'var(--color-gray-800)', display: 'flex', alignItems: 'center', gap: 4, textDecoration: 'none' }}
+                                        className="btn btn-outline"
+                                        style={{ flex: 1, minWidth: '120px', justifyContent: 'center' }}
                                     >
-                                        {seller.store_name || seller.name}
-                                        {seller.is_verified && (
-                                            <FaCheckCircle style={{ color: '#1d9bf0', fontSize: '0.9rem' }} title="Verified Seller" />
-                                        )}
-                                        {seller.seller_rating && (
-                                            <span style={{ color: 'var(--color-gray-500)', fontSize: '0.8rem', display: 'flex', alignItems: 'center', gap: 2, marginLeft: 4, fontWeight: 500 }}>
-                                                <FaStar color="#f59e0b" /> {seller.seller_rating} ({seller.seller_reviews_count})
-                                            </span>
-                                        )}
+                                        View Profile
                                     </Link>
-                                    <p style={{ fontSize: 'var(--font-size-xs)', color: 'var(--color-gray-500)', display: 'flex', alignItems: 'center', gap: 4 }}>
-                                        <FaMapMarkerAlt /> {seller.department}
-                                    </p>
+                                    {seller.phone && (
+                                        <a href={`tel:${seller.phone}`} className="btn btn-outline" style={{ flex: 1, minWidth: '100px', justifyContent: 'center' }}>
+                                            Contact
+                                        </a>
+                                    )}
+                                    {isAuthenticated && seller.id !== user?.id && (!isFreeItem || canChatForFree) && (
+                                        <Link
+                                            to={`/chat?seller=${seller.id}&product=${product.id}`}
+                                            className="btn btn-primary"
+                                            style={{ flex: '2 1 180px', display: 'inline-flex', alignItems: 'center', gap: 6, justifyContent: 'center' }}
+                                        >
+                                            <FaCommentDots /> Chat with Seller
+                                        </Link>
+                                    )}
                                 </div>
-                                {seller.phone && (
-                                    <a href={`tel:${seller.phone}`} className="btn btn-outline" style={{ fontSize: '0.8rem', padding: '8px 16px' }}>
-                                        Contact
-                                    </a>
-                                )}
-                                {isAuthenticated && seller.id !== user?.id && (!isFreeItem || canChatForFree) && (
-                                    <Link
-                                        to={`/chat?seller=${seller.id}&product=${product.id}`}
-                                        className="btn btn-primary"
-                                        style={{ fontSize: '0.8rem', padding: '8px 16px', display: 'inline-flex', alignItems: 'center', gap: 6 }}
-                                    >
-                                        <FaCommentDots /> Chat with Seller
-                                    </Link>
-                                )}
                             </div>
                         </div>
                     </div>
@@ -702,11 +740,12 @@ function ReviewCard({ review }) {
     return (
         <div style={{ padding: 'var(--space-4)', borderBottom: '1px solid var(--color-gray-100)' }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 'var(--space-3)', marginBottom: 'var(--space-2)' }}>
-                <img
-                    src={reviewer.avatar_url || defaultAvatar}
+                <ImageWithFallback
+                    src={reviewer.avatar_url}
                     alt={reviewer.name}
-                    style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover' }}
-                    onError={(e) => { e.target.src = defaultAvatar; }}
+                    fallbackSrc={defaultAvatar}
+                    wrapperStyle={{ width: 36, height: 36, borderRadius: '50%' }}
+                    imgStyle={{ objectFit: 'cover' }}
                 />
                 <div>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap' }}>

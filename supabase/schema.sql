@@ -34,6 +34,7 @@ create table if not exists public.products (
   seller_id uuid not null references public.users(id) on update cascade on delete restrict,
   image_url text not null,
   image_urls text[] not null default '{}'::text[],
+  is_used boolean not null default false,
   status text not null default 'available' check (status in ('available', 'sold')),
   created_at timestamptz not null default now()
 );

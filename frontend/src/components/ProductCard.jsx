@@ -1,4 +1,5 @@
 import { Link } from 'react-router-dom';
+import ImageWithFallback from './ImageWithFallback';
 import { FaMapMarkerAlt, FaCheckCircle, FaStar, FaTags } from 'react-icons/fa';
 
 function ProductCard({ product }) {
@@ -13,22 +14,26 @@ function ProductCard({ product }) {
     const sRating = product.users?.seller_rating;
     const sCount = product.users?.seller_reviews_count;
     const isFree = Number(product.price) === 0;
+    const isUsed = Boolean(product.is_used);
+
+    const imageFallback = 'https://placehold.co/400x300/e5e7eb/9ca3af?text=No+Image';
 
     return (
         <article className="product-card">
             <Link to={`/product/${product.id}`} style={{ textDecoration: 'none', color: 'inherit' }}>
-                <div className="product-card-image-wrap">
-                    <img
-                        src={product.image_url}
-                        alt={product.title}
-                        loading="lazy"
-                        onError={(e) => {
-                            e.target.src = 'https://placehold.co/400x300/e5e7eb/9ca3af?text=No+Image';
-                        }}
-                    />
-                    <span className="product-card-category badge badge-accent">
+                <div className="product-card-category-header">
+                    <span className="badge badge-accent">
                         {categoryName}
                     </span>
+                </div>
+                <div className="product-card-image-wrap">
+                    <ImageWithFallback
+                        src={product.image_url}
+                        alt={product.title}
+                        fallbackSrc={imageFallback}
+                        loading="lazy"
+                        imgStyle={{ objectFit: 'contain' }}
+                    />
                 </div>
 
                 <div className="product-card-body" style={{ paddingBottom: 'var(--space-2)' }}>
@@ -40,9 +45,27 @@ function ProductCard({ product }) {
                     ) : (
                         <div style={{ height: 16, marginBottom: 8 }} />
                     )}
-                    <p className={`product-card-price ${isFree ? 'price-free' : ''}`} style={{ margin: 0 }}>
+                    <p className={`product-card-price ${isFree || isUsed ? 'price-free' : ''}`} style={{ margin: 0 }}>
                         {isFree ? 'Free' : `₦${Number(product.price).toLocaleString()}`}
                     </p>
+                    <p style={{ fontSize: '0.75rem', color: 'var(--color-gray-500)', marginTop: 6 }}>
+                        Condition: {isUsed ? 'Used' : 'New'}
+                    </p>
+                    {(isFree || isUsed) && (
+                        <div className="product-card-badges">
+                            {isFree && (
+                                <span className="badge badge-primary">Free</span>
+                            )}
+                            {isUsed && (
+                                <span className="badge badge-accent">Used</span>
+                            )}
+                        </div>
+                    )}
+                    {!isFree && !isUsed && (
+                        <div className="product-card-badges">
+                            <span className="badge badge-accent">New</span>
+                        </div>
+                    )}
                 </div>
             </Link>
 

@@ -20,6 +20,19 @@ class UserReviewController {
       next(error);
     }
   }
+
+  static async getUserReviews(req, res, next) {
+    try {
+      const { userId } = req.params;
+      const [reviews, stats] = await Promise.all([
+        userReviewService.getUserReviews(userId),
+        userReviewService.getUserStats(userId)
+      ]);
+      res.json({ success: true, data: { reviews, stats } });
+    } catch (error) {
+      next(error);
+    }
+  }
 }
 
 module.exports = UserReviewController;
